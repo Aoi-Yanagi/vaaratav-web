@@ -1,6 +1,6 @@
 "use client";
 
-import Navbar from "@/components/ui/navbar";
+import Navbar from "@/components/ui/nav-top";
 import Sidebar from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

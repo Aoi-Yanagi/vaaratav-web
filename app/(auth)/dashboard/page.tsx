@@ -1,7 +1,7 @@
 // app/dashboard/page.tsx
 "use client";
 
-import { Navbar } from "@/components/ui/navbar";
+import { Navbar } from "@/components/ui/nav-top";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { 
