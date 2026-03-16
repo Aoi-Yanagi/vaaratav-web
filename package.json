@@ -6,7 +6,8 @@
     "dev": "nodemon server.mjs",
     "build": "next build",
     "start": "node server.mjs",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.4",
