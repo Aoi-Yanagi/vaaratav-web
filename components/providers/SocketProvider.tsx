@@ -25,7 +25,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [socket] = useState(() => {
     // Check if running on client-side to avoid SSR errors
     if (typeof window !== 'undefined') {
-      return io(); 
+      return io("https://vaaratav-socket.onrender.com"); 
     }
     return null;
   });
