@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 
-export function Sidebar(){
+export default function Sidebar(){
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   
