@@ -1,7 +1,7 @@
 // app/dashboard/page.tsx
 "use client";
 
-import { Navbar } from "@/components/ui/nav-top";
+import GlobalNavigation from "@/components/ui/global-navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { 
@@ -22,7 +22,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+      <GlobalNavigation />
 
       <div className="container mx-auto pt-24 px-4 flex flex-col lg:flex-row gap-8">
         
