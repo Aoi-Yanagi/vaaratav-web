@@ -1,6 +1,6 @@
 "use client";
 
-import Navbar from "@/components/ui/nav-top";
+import GlobalNavigation from "@/components/ui/global-navigation";
 import Sidebar from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,7 +59,7 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen bg-black text-white selection:bg-indigo-500/30 overflow-hidden">
-      <Navbar />
+      <GlobalNavigation />
 
       {/* --- THE MASSIVE GLOWING BACKGROUND EFFECT --- */}
       <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[800px] h-[500px] opacity-40 blur-[120px] rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 pointer-events-none z-0" />

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion, Variants } from 'framer-motion';
 import { useEffect, useState } from 'react';
 
-export default function Navbar() {
+export default function GlobalNavigation() {
   const { isSignedIn, isLoaded } = useAuth();
   
   // 1. Safe, standard React state
