@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import Hero3D from "@/components/3d/HeroGeometric";
 import { motion, Variants } from "framer-motion";
 import { Keyboard, Video, Zap, Lock, Shield, VideoIcon, ZapIcon, Globe } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react"; 
 import { useRouter } from "next/navigation";
 import FeaturesGrid from "@/components/ui/features-grid";
 import FaqSection from "@/components/ui/faq-section";
@@ -20,16 +20,9 @@ import { useSession, signIn } from "next-auth/react";
 export default function Home() {
   const router = useRouter();
   const [meetingCode, setMeetingCode] = useState("");
-  const [mounted, setMounted] = useState(false);
 
-  // NextAuth Hook
   const { data: session, status } = useSession();
   const isLoggedIn = !!session;
-
-  // Hydration safety
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const startNewMeeting = () => {
     const randomId = Math.random().toString(36).substring(2, 8);
@@ -59,7 +52,10 @@ export default function Home() {
     { text: "No Downloads Required", icon: <Globe className="w-4 h-4 text-blue-400" /> },
   ];
 
-  if (!mounted) return <main className="min-h-screen bg-black" />;
+  // If NextAuth is still checking the database, show a clean black screen
+  if (status === "loading") {
+    return <main className="min-h-[100dvh] bg-black" />;
+  }
 
   return (
     <main className="relative min-h-[100dvh] bg-black text-white selection:bg-indigo-500/30 overflow-hidden">
@@ -67,10 +63,8 @@ export default function Home() {
 
       <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[800px] h-[500px] opacity-40 blur-[120px] rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 pointer-events-none z-0" />
 
-      {/* Changed to h-[100dvh] for mobile Safari support */}
       <div className="flex h-[100dvh] pt-16"> 
         
-        {/* Hidden on mobile, visible on medium screens and up */}
         <div className="hidden md:block">
             {isLoggedIn && <Sidebar />}
         </div>
@@ -127,8 +121,7 @@ export default function Home() {
                   </Card>
               </div>
 
-              {/* NEXTAUTH LOCK OVERLAY */}
-              {!isLoggedIn && status !== "loading" && (
+              {!isLoggedIn && (
                 <div className="absolute inset-0 z-20 flex flex-col items-center justify-center">
                     <div className="bg-black/70 backdrop-blur-md border border-indigo-500/30 p-5 rounded-2xl flex items-center gap-4 shadow-2xl w-[90%] sm:w-auto">
                         <div className="p-3 bg-indigo-500/20 rounded-full hidden sm:block">
