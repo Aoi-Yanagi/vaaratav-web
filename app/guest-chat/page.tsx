@@ -2,17 +2,17 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldAlert, Timer, XCircle, Mic, MicOff, Video as VideoIcon, VideoOff, Terminal } from "lucide-react";
+import { Timer, X, Mic, MicOff, Video as VideoIcon, VideoOff, ShieldCheck, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSocket } from "@/components/providers/SocketProvider";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function GuestChat() {
   const router = useRouter();
   const { socket } = useSocket();
   
   const [timeLeft, setTimeLeft] = useState(300);
-  const [isClosing, setIsClosing] = useState(false); // Controls the exit animation
+  const [isClosing, setIsClosing] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -22,9 +22,8 @@ export default function GuestChat() {
 
   // --- CLEANUP & EXIT FUNCTION ---
   const endSession = () => {
-    setIsClosing(true); // Trigger the fade-out animation
+    setIsClosing(true);
     
-    // Stop all media tracks immediately so the camera light turns off
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null; 
@@ -34,13 +33,12 @@ export default function GuestChat() {
         socket.emit("leave-room", "guest-lobby"); 
     }
 
-    // Wait for the animation to finish (600ms) before changing the page
     setTimeout(() => {
-        router.push('/meeting-ended'); // Update this route to wherever you want them to go
+        router.push('/'); // Redirecting back to home for a smooth exit
     }, 600);
   };
 
-  // 1. COUNTDOWN TIMER LOGIC
+  // 1. COUNTDOWN TIMER
   useEffect(() => {
     if (timeLeft <= 0) {
       endSession();
@@ -113,77 +111,91 @@ export default function GuestChat() {
   };
 
   return (
-    // Replaced h-screen with h-[100dvh] for perfect mobile Safari rendering
     <motion.div 
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: isClosing ? 0 : 1, scale: isClosing ? 0.95 : 1 }}
-      transition={{ duration: 0.5, ease: "easeInOut" }}
-      className="flex flex-col h-[100dvh] bg-black text-green-500 font-mono relative overflow-hidden selection:bg-green-500/30"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: isClosing ? 0 : 1 }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      className="flex flex-col items-center min-h-[100dvh] bg-zinc-950 text-zinc-100 font-sans relative overflow-hidden selection:bg-indigo-500/30"
     >
-      
-      {/* Sleeker Background Matrix Effect */}
-      <div className="absolute inset-0 opacity-15 pointer-events-none bg-[url('https://upload.wikimedia.org/wikipedia/commons/1/17/Matrix_digital_rain_screensaver.png')] bg-cover mix-blend-screen" />
-      <div className="absolute inset-0 bg-gradient-to-b from-black via-transparent to-black pointer-events-none" />
+      {/* Premium Background Orbs (Matches your Landing Page) */}
+      <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-cyan-600/20 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
+      <div className="absolute inset-0 bg-[url('/noise.png')] opacity-20 mix-blend-overlay pointer-events-none" /> {/* Optional: Add a subtle noise texture if you have one */}
 
-      {/* Floating Header */}
+      {/* Floating Header Pill */}
       <motion.header 
-        initial={{ y: -50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-        className="flex items-center justify-between m-4 p-4 rounded-2xl border border-green-900/50 bg-black/60 backdrop-blur-xl shadow-[0_0_30px_rgba(34,197,94,0.1)] z-10"
+        initial={{ y: -40, opacity: 0, scale: 0.95 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        transition={{ delay: 0.2, duration: 0.8, type: "spring", bounce: 0.4 }}
+        className="flex items-center justify-between w-full max-w-5xl mt-6 px-4 z-20"
       >
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-red-500/10 rounded-lg border border-red-500/20">
-             <ShieldAlert className="w-5 h-5 animate-pulse text-red-500" />
-          </div>
-          <span className="font-bold tracking-widest uppercase text-white hidden sm:block">Incognito</span>
+        <div className="flex items-center gap-3 px-5 py-2.5 bg-white/5 border border-white/10 backdrop-blur-xl rounded-full shadow-lg">
+          <ShieldCheck className="w-5 h-5 text-indigo-400" />
+          <span className="text-sm font-medium tracking-wide text-zinc-200 hidden sm:block">Secure Guest Session</span>
         </div>
         
-        <div className={`flex items-center gap-2 text-2xl font-bold bg-black/50 px-4 py-2 rounded-xl border ${timeLeft < 60 ? 'text-red-500 border-red-500/30 animate-pulse' : 'text-green-500 border-green-500/30'}`}>
-          <Timer className="w-5 h-5" />
+        <div className={`flex items-center gap-2 text-lg font-semibold px-5 py-2.5 rounded-full border backdrop-blur-xl shadow-lg transition-colors duration-500 ${timeLeft < 60 ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-white/5 border-white/10 text-zinc-200'}`}>
+          <Timer className={`w-5 h-5 ${timeLeft < 60 ? 'animate-pulse' : ''}`} />
           {formatTime(timeLeft)}
         </div>
 
         <Button 
-            variant="destructive" 
+            variant="ghost" 
             onClick={endSession} 
-            className="hover:bg-red-600 bg-red-500/20 text-red-500 border border-red-500/50 z-50 rounded-xl transition-all hover:scale-105 active:scale-95 font-bold tracking-wide"
+            className="group px-5 py-2.5 bg-white/5 hover:bg-red-500/20 border border-white/10 hover:border-red-500/30 text-zinc-300 hover:text-red-400 rounded-full transition-all duration-300"
         >
-          <XCircle className="w-4 h-4 mr-2" /> End
+          <X className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform duration-300" /> 
+          <span className="font-medium">Leave</span>
         </Button>
       </motion.header>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 gap-8 z-10 overflow-y-auto">
+      {/* Main Video Container */}
+      <div className="flex-1 flex flex-col items-center justify-center w-full max-w-5xl p-4 sm:p-6 z-10">
         
-        {/* The Video Container */}
         <motion.div 
-          initial={{ y: 50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.3, type: "spring", stiffness: 150 }}
-          className="relative w-full max-w-3xl aspect-video bg-neutral-950 rounded-3xl border border-green-500/30 overflow-hidden shadow-[0_0_40px_rgba(34,197,94,0.15)] group"
+          initial={{ y: 40, opacity: 0, scale: 0.95 }}
+          animate={{ y: 0, opacity: 1, scale: isClosing ? 0.9 : 1 }}
+          transition={{ delay: 0.3, duration: 0.8, type: "spring", bounce: 0.3 }}
+          className="relative w-full aspect-video bg-zinc-900/50 backdrop-blur-sm rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl group"
         >
-            <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover transition-opacity duration-500 ${!isCamOn && 'opacity-0'}`} />
+            {/* The Video Stream */}
+            <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted 
+                className={`w-full h-full object-cover transition-opacity duration-700 ${!isCamOn ? 'opacity-0' : 'opacity-100'}`} 
+            />
             
-            {!isCamOn && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm">
-                    <VideoOff className="w-16 h-16 text-green-900 mb-4" />
-                    <span className="text-green-700 tracking-widest font-bold animate-pulse">CAMERA DISABLED</span>
-                </div>
-            )}
+            {/* Camera Off State */}
+            <AnimatePresence>
+                {!isCamOn && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/90 backdrop-blur-md"
+                    >
+                        <div className="w-20 h-20 rounded-full bg-zinc-800 flex items-center justify-center border border-white/5 shadow-xl mb-4">
+                            <VideoOff className="w-8 h-8 text-zinc-500" />
+                        </div>
+                        <span className="text-zinc-400 font-medium tracking-wide">Camera is turned off</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-            {/* Floating Glass Control Dock */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-4 p-2 bg-black/50 backdrop-blur-md rounded-2xl border border-green-500/20 opacity-90 hover:opacity-100 transition-opacity">
+            {/* Floating Control Dock (macOS Style) */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 p-2 bg-zinc-950/60 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-500">
                 <Button 
-                    size="lg"
-                    className={`rounded-xl transition-all active:scale-95 ${isMicOn ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'}`}
+                    size="icon"
+                    className={`w-12 h-12 rounded-xl transition-all duration-300 active:scale-90 ${isMicOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 hover:bg-red-600 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)]'}`}
                     onClick={toggleMic}
                 >
                     {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                 </Button>
                 <Button 
-                    size="lg"
-                    className={`rounded-xl transition-all active:scale-95 ${isCamOn ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'}`}
+                    size="icon"
+                    className={`w-12 h-12 rounded-xl transition-all duration-300 active:scale-90 ${isCamOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 hover:bg-red-600 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)]'}`}
                     onClick={toggleCam}
                 >
                     {isCamOn ? <VideoIcon className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
@@ -191,40 +203,21 @@ export default function GuestChat() {
             </div>
         </motion.div>
 
-        {/* The Terminal Panel */}
+        {/* Minimalist Connection Info Pill */}
         <motion.div 
-          initial={{ x: 50, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.4, type: "spring", stiffness: 150 }}
-          className="w-full max-w-md"
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.8 }}
+          className="mt-6 flex items-center gap-6 px-6 py-3 bg-white/5 border border-white/5 backdrop-blur-md rounded-full text-xs font-medium text-zinc-400"
         >
-            <div className="w-full border border-green-900/50 bg-black/80 backdrop-blur-md rounded-2xl overflow-hidden shadow-2xl">
-                {/* Terminal Header */}
-                <div className="bg-green-950/30 px-4 py-3 border-b border-green-900/50 flex items-center gap-2">
-                    <Terminal className="w-4 h-4 text-green-500" />
-                    <span className="text-xs font-bold tracking-widest text-green-400">SESSION_LOG.EXE</span>
-                </div>
-                
-                {/* Terminal Body */}
-                <div className="p-6 space-y-4">
-                    <div className="space-y-2">
-                        <p className="text-xs text-green-600 flex items-center gap-2">
-                            <span className="text-green-500">&gt;</span> STATUS: <span className="text-white font-bold bg-green-900/50 px-2 py-0.5 rounded">ENCRYPTED</span>
-                        </p>
-                        <p className="text-xs text-green-600 flex items-center gap-2">
-                            <span className="text-green-500">&gt;</span> SOCKET_ID: <span className="text-gray-300">{socket?.id || 'ESTABLISHING_CONNECTION...'}</span>
-                        </p>
-                        <p className="text-xs text-green-600 flex items-center gap-2">
-                            <span className="text-green-500">&gt;</span> TTL: <span className="text-gray-300">{timeLeft} SECONDS</span>
-                        </p>
-                    </div>
-
-                    <div className="h-px w-full bg-gradient-to-r from-green-900/0 via-green-900 to-green-900/0 my-4" />
-                    
-                    <p className="text-[10px] text-green-800 leading-relaxed uppercase">
-                        Warning: This is a volatile session. All traces, packets, and media streams will be permanently wiped upon termination. Do not refresh the page.
-                    </p>
-                </div>
+            <div className="flex items-center gap-2">
+                <Activity className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Socket: {socket?.id ? socket.id.substring(0, 8) + '...' : 'Connecting'}</span>
+            </div>
+            <div className="w-1 h-1 rounded-full bg-white/20" /> {/* Dot separator */}
+            <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                <span>E2E Encrypted</span>
             </div>
         </motion.div>
 
