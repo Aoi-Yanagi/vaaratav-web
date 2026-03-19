@@ -1,12 +1,12 @@
 "use client";
 
-import { useAuth, UserButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import { motion, Variants } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { useSession, signIn } from "next-auth/react";
 
 export default function GlobalNavigation() {
-  const { isSignedIn, isLoaded } = useAuth();
+ const { data: session, status } = useSession();
   
   // 1. Safe, standard React state
   const [animType, setAnimType] = useState<number>(0);
@@ -25,7 +25,7 @@ export default function GlobalNavigation() {
   }, []);
 
   // Wait for Clerk AND the client to load
-  if (!isLoaded || !isClient) return null;
+  if (status === "loading" || !isClient) return null;
 
   // --- LOGO ANIMATION LOGIC ---
   const logoText = "Vaarta. V".split("");
@@ -89,7 +89,7 @@ export default function GlobalNavigation() {
         {/* --- ACTIONS SECTION --- */}
         <div className="flex items-center gap-5">
           
-          {!isSignedIn && (
+          {!!session && (
             <>
               <Link href="/login" className="text-sm font-medium text-gray-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] transition-all px-4 py-2">
                 Log In
@@ -104,14 +104,13 @@ export default function GlobalNavigation() {
             </>
           )}
 
-          {isSignedIn && (
+          {!!session && (
             <motion.div 
               whileHover={{ scale: 1.05 }} 
               whileTap={{ scale: 0.95 }}
               className="relative p-[2px] rounded-full bg-gradient-to-r from-indigo-500 to-cyan-400 shadow-lg shadow-indigo-500/20"
             >
               <div className="bg-black p-1 rounded-full flex items-center justify-center">
-                <UserButton />
               </div>
             </motion.div>
           )}

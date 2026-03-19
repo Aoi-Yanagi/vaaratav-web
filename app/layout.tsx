@@ -4,7 +4,10 @@ import "./globals.css";
 import { SocketProvider } from "@/components/providers/SocketProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { cn } from "@/lib/utils";
-import { ClerkProvider } from '@clerk/nextjs';
+import { Providers } from "@/components/Providers";
+
+
+
 const inter = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -30,19 +33,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    
     <html lang="en" suppressHydrationWarning>
-      <ClerkProvider afterSignOutUrl={'/login'}>
+ 
       <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
             
             {/* MAJOR: Add the SocketProvider inside the ThemeProvider */}
             <SocketProvider>
+               <Providers> 
               {children}
+              </Providers>    
             </SocketProvider>
         </ThemeProvider>
-        
+    
       </body>
-      </ClerkProvider>
+    
     </html>
   );
 }
