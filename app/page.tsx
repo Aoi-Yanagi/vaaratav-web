@@ -26,7 +26,7 @@ export default function Home() {
   const { data: session, status } = useSession();
   const isLoggedIn = !!session;
 
-  // Hydration safety: Prevents UI flickering before Next.js loads the client
+  // Hydration safety
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -59,17 +59,21 @@ export default function Home() {
     { text: "No Downloads Required", icon: <Globe className="w-4 h-4 text-blue-400" /> },
   ];
 
-  // Show a clean black screen for a split second while React hydrates
   if (!mounted) return <main className="min-h-screen bg-black" />;
 
   return (
-    <main className="relative min-h-screen bg-black text-white selection:bg-indigo-500/30 overflow-hidden">
+    <main className="relative min-h-[100dvh] bg-black text-white selection:bg-indigo-500/30 overflow-hidden">
       <GlobalNavigation />
 
       <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[800px] h-[500px] opacity-40 blur-[120px] rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 pointer-events-none z-0" />
 
-      <div className="flex h-screen pt-16"> 
-        {isLoggedIn && <Sidebar />}
+      {/* Changed to h-[100dvh] for mobile Safari support */}
+      <div className="flex h-[100dvh] pt-16"> 
+        
+        {/* Hidden on mobile, visible on medium screens and up */}
+        <div className="hidden md:block">
+            {isLoggedIn && <Sidebar />}
+        </div>
 
         <div id="main-scroll-container" className="flex-1 relative overflow-y-auto w-full flex flex-col items-center">
           <div className="absolute inset-0 z-0">
@@ -126,16 +130,16 @@ export default function Home() {
               {/* NEXTAUTH LOCK OVERLAY */}
               {!isLoggedIn && status !== "loading" && (
                 <div className="absolute inset-0 z-20 flex flex-col items-center justify-center">
-                    <div className="bg-black/70 backdrop-blur-md border border-indigo-500/30 p-5 rounded-2xl flex items-center gap-4 shadow-2xl">
-                        <div className="p-3 bg-indigo-500/20 rounded-full">
+                    <div className="bg-black/70 backdrop-blur-md border border-indigo-500/30 p-5 rounded-2xl flex items-center gap-4 shadow-2xl w-[90%] sm:w-auto">
+                        <div className="p-3 bg-indigo-500/20 rounded-full hidden sm:block">
                             <Lock className="w-6 h-6 text-indigo-400" />
                         </div>
-                        <div className="text-left">
+                        <div className="text-center sm:text-left">
                             <p className="text-base font-bold text-white">Login Required</p>
-                            <p className="text-sm text-gray-300">Sign in to host unlimited meetings</p>
+                            <p className="text-sm text-gray-300 hidden sm:block">Sign in to host unlimited meetings</p>
                         </div>
-                        <Button onClick={() => signIn("github")} className="ml-4 bg-indigo-600 hover:bg-indigo-500 rounded-full px-6 transition-transform hover:scale-105">
-                            Log In with GitHub
+                        <Button onClick={() => signIn("github")} className="mt-4 sm:mt-0 sm:ml-4 bg-indigo-600 hover:bg-indigo-500 rounded-full px-6 transition-transform hover:scale-105 w-full sm:w-auto">
+                            Log In
                         </Button>
                     </div>
                 </div>
@@ -147,7 +151,7 @@ export default function Home() {
                  <span className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Or try instantly</span>
                  <Button variant="outline" className="border-white/20 hover:bg-white/10 text-white bg-transparent" onClick={() => router.push('/guest-chat')}>
                     <Zap className="w-4 h-4 mr-2" /> 
-                    Start 5-Min Guest Chat (No Login)
+                    Start 5-Min Guest Chat
                   </Button>
               </div>
             </motion.div>

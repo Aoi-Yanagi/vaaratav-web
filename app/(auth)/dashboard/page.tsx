@@ -1,4 +1,3 @@
-// app/dashboard/page.tsx
 "use client";
 
 import GlobalNavigation from "@/components/ui/global-navigation";
@@ -8,8 +7,15 @@ import {
   Calendar, Clock, Plus, Video, 
   Users, Settings, MoreHorizontal 
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 
 export default function Dashboard() {
+  const { data: session } = useSession();
+
+  const userName = session?.user?.name || "Guest User";
+  const userImage = session?.user?.image;
+  const initials = userName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
+
   const upcomingMeetings = [
     { id: 1, title: "Team Standup", time: "10:00 AM", date: "Today", participants: 4 },
     { id: 2, title: "Project Review", time: "2:00 PM", date: "Tomorrow", participants: 8 },
@@ -21,26 +27,28 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-[100dvh] bg-black text-white">
       <GlobalNavigation />
 
-      <div className="container mx-auto pt-24 px-4 flex flex-col lg:flex-row gap-8">
+      <div className="container mx-auto pt-24 px-4 pb-12 flex flex-col lg:flex-row gap-8">
         
         {/* --- LEFT SIDEBAR (Quick Actions) --- */}
         <div className="w-full lg:w-1/4 space-y-6">
           
-          {/* User Profile Card */}
           <Card className="p-6 bg-neutral-900 border-neutral-800 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-lg">
-              JD
-            </div>
+             {userImage ? (
+              <img src={userImage} alt="Profile" className="h-12 w-12 rounded-full border-2 border-indigo-500/50" />
+            ) : (
+              <div className="h-12 w-12 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-lg">
+                {initials}
+              </div>
+            )}
             <div>
-              <h3 className="font-semibold">John Doe</h3>
+              <h3 className="font-semibold">{userName}</h3>
               <p className="text-sm text-gray-400">Pro Member</p>
             </div>
           </Card>
 
-          {/* Action Buttons */}
           <div className="grid grid-cols-1 gap-4">
             <Button className="h-14 bg-indigo-600 hover:bg-indigo-700 justify-start text-lg px-6">
               <Plus className="mr-3 w-6 h-6" /> New Meeting
@@ -57,7 +65,6 @@ export default function Dashboard() {
         {/* --- MAIN CONTENT --- */}
         <div className="flex-1 space-y-8">
           
-          {/* Stats Row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="p-6 bg-indigo-900/20 border-indigo-500/30">
               <h3 className="text-indigo-400 text-sm font-medium uppercase">Upcoming</h3>
@@ -73,7 +80,6 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Upcoming Section */}
           <section>
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
               <Clock className="w-5 h-5 text-indigo-500" /> Upcoming Meetings
@@ -97,7 +103,6 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* History Section */}
           <section>
             <h2 className="text-xl font-bold mb-4">Recent History</h2>
             <div className="rounded-xl border border-neutral-800 overflow-hidden">
