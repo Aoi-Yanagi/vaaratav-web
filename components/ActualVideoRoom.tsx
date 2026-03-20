@@ -12,7 +12,12 @@ interface ActualVideoRoomProps { roomCode: string; role: "HOST" | "PARTICIPANT" 
 
 type OfferData = { caller: string; offer: RTCSessionDescriptionInit; callerName: string; callerRole: string; roomId: string; };
 type AnswerData = { caller: string; answer: RTCSessionDescriptionInit; callerName: string; callerRole: string; roomId: string; };
-type IceCandidateData = { caller: string; candidate: RTCIceCandidateInit; };
+type IceCandidateData = { 
+  target: string;
+  caller: string; 
+  candidate: RTCIceCandidateInit; 
+  roomId: string; 
+};
 type CommandMessage = { type: "MUTE_ALL" | "KICK"; targetId?: string; };
 
 const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }] };
@@ -82,7 +87,7 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
     };
   }, [socket, roomCode, myName]);
 
-  // 2. WEBRTC SIGNALING (Notice: No dependent on the state variable localStream)
+ // 2. WEBRTC SIGNALING (The ICE Candidate Fix)
   useEffect(() => {
     if (!socket) return;
 
@@ -92,7 +97,6 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
 
       setRemoteUsers(prev => ({ ...prev, [userId]: { ...(prev[userId] || {}), name: userName, role: "CONNECTING..." } }));
 
-      // Use the ref to grab the stream so this effect doesn't need to re-run
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => peerConnection.addTrack(track, localStreamRef.current!));
       }
@@ -101,8 +105,16 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
         setRemoteUsers((prev) => ({ ...prev, [userId]: { ...(prev[userId] || {}), stream: event.streams[0] } }));
       };
 
+      // FIX 1: We added caller: socket.id so the receiver knows who sent the ICE candidate!
       peerConnection.onicecandidate = (event) => {
-        if (event.candidate) socket.emit("ice-candidate", { target: userId, candidate: event.candidate, roomId: roomCode });
+        if (event.candidate) {
+          socket.emit("ice-candidate", { 
+            target: userId, 
+            caller: socket.id, 
+            candidate: event.candidate, 
+            roomId: roomCode 
+          });
+        }
       };
 
       const offer = await peerConnection.createOffer();
@@ -125,8 +137,16 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
         setRemoteUsers((prev) => ({ ...prev, [data.caller]: { ...(prev[data.caller] || {}), stream: event.streams[0] } }));
       };
 
+      // FIX 2: Added caller: socket.id here too!
       peerConnection.onicecandidate = (event) => {
-        if (event.candidate) socket.emit("ice-candidate", { target: data.caller, candidate: event.candidate, roomId: roomCode });
+        if (event.candidate) {
+          socket.emit("ice-candidate", { 
+            target: data.caller, 
+            caller: socket.id, 
+            candidate: event.candidate, 
+            roomId: roomCode 
+          });
+        }
       };
 
       await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
@@ -143,9 +163,16 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
       if (peerConnection) await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
     });
 
+    // FIX 3: Added a safety try/catch block. Sometimes ICE candidates arrive a millisecond before the offer finishes processing.
     socket.on("ice-candidate", async (data: IceCandidateData) => {
       const peerConnection = peersRef.current[data.caller];
-      if (peerConnection) await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      if (peerConnection) {
+        try {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (e) {
+          console.log("Safely caught ICE timing race condition", e);
+        }
+      }
     });
 
     socket.on("user-disconnected", (userId: string) => {
@@ -167,7 +194,7 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
       socket.off("ice-candidate"); 
       socket.off("user-disconnected");
     };
-  }, [socket, roomCode, myName, role]); // Perfect dependencies
+  }, [socket, roomCode, myName, role]);
 
   // 3. HOST CONTROLS
   useEffect(() => {
