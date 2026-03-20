@@ -20,13 +20,30 @@ import { useSession, signIn } from "next-auth/react";
 export default function Home() {
   const router = useRouter();
   const [meetingCode, setMeetingCode] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
   const { data: session, status } = useSession();
   const isLoggedIn = !!session;
 
-  const startNewMeeting = () => {
-    const randomId = Math.random().toString(36).substring(2, 8);
-    router.push(`/meeting/${randomId}`);
+ const startNewMeeting = async () => {
+    if (!isLoggedIn) {
+      // Force them to login if they bypassed the UI lock
+      signIn("github");
+      return;
+    }
+    try {
+      setIsCreating(true);
+      const res = await fetch("/api/meetings", { method: "POST" });
+      const data = await res.json();
+      
+      if (data.meetingCode) {
+        router.push(`/meeting/${data.meetingCode}`);
+      }
+    } catch (error) {
+      console.error("Failed to create meeting", error);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const joinMeeting = () => {
@@ -99,9 +116,9 @@ export default function Home() {
               
               <div className={`relative transition-all duration-500 ${!isLoggedIn ? 'opacity-50 grayscale blur-[2px] pointer-events-none select-none' : ''}`}>
                  <Card className="p-3 bg-white/5 border-white/10 backdrop-blur-xl flex flex-col sm:flex-row gap-3 shadow-2xl shadow-indigo-900/20 rounded-2xl">
-                    <Button size="lg" className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 h-14 text-base font-semibold transition-all rounded-xl" onClick={startNewMeeting}>
+                    <Button size="lg" className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 h-14 text-base font-semibold transition-all rounded-xl" onClick={startNewMeeting} disabled={isCreating}>
                       <Video className="w-5 h-5 mr-2" />
-                      New Meeting
+                      {isCreating ? 'Creating...' : 'New Meeting'}
                     </Button>
                     <div className="flex-1 flex gap-2">
                       <div className="relative flex-1">
