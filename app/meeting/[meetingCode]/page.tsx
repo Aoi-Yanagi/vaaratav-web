@@ -4,7 +4,7 @@ import { useState, useEffect, use } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Copy, Video, ShieldCheck, Crown, User, Loader2 } from "lucide-react";
-import { ActualVideoRoom } from "@/components/ActualVideoRoom"; // <-- Make sure this is imported!
+import { ActualVideoRoom } from "@/components/ActualVideoRoom";
 
 export default function MeetingLobby({ params }: { params: Promise<{ meetingCode: string }> }) {
   const unwrappedParams = use(params);
@@ -14,13 +14,13 @@ export default function MeetingLobby({ params }: { params: Promise<{ meetingCode
   
   const [hasJoined, setHasJoined] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [meetingLink, setMeetingLink] = useState(""); // <-- FIX: State for the URL
+  const [meetingLink, setMeetingLink] = useState("");
   
   const [role, setRole] = useState<"HOST" | "PARTICIPANT" | "GUEST" | null>(null);
   const [isLoadingRole, setIsLoadingRole] = useState(true);
   const [meetingError, setMeetingError] = useState("");
 
-  // FIX: Safely grab the URL only after the component mounts on the client
+  // Safely grab the URL only after the component mounts on the client.
   useEffect(() => {
     setMeetingLink(`${window.location.origin}/meeting/${meetingCode}`);
   }, [meetingCode]);

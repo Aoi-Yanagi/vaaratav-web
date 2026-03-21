@@ -14,7 +14,7 @@ export default function Lobby() {
   const [isCamOn, setIsCamOn] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Simulated Media Stream effect
+  // Simulated Media Stream effect.
   useEffect(() => {
     const startPreview = async () => {
       if (isCamOn) {
@@ -67,7 +67,7 @@ export default function Lobby() {
             </div>
           )}
 
-          {/* Floating Control Bar Overlay */}
+          {/* Floating Control Bar Overlay. */}
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/60 backdrop-blur-xl px-4 py-3 rounded-full border border-white/10 shadow-2xl transition-transform duration-300 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100">
             <button
               onClick={() => setIsMicOn(!isMicOn)}
@@ -84,7 +84,7 @@ export default function Lobby() {
             </button>
           </div>
           
-          {/* Audio Indicator */}
+          {/* Audio SIGN */}
           <div className="absolute top-6 left-6 bg-black/50 backdrop-blur-md px-4 py-2 rounded-full text-xs font-medium border border-white/5 flex items-center gap-2">
             {isMicOn ? (
               <>
@@ -138,7 +138,7 @@ export default function Lobby() {
                <Button className="flex-1 h-14 bg-indigo-600 hover:bg-indigo-500 text-white text-lg font-semibold rounded-2xl shadow-[0_0_20px_rgba(99,102,241,0.3)] hover:shadow-[0_0_30px_rgba(99,102,241,0.5)] transition-all hover:-translate-y-0.5">
                  Join Meeting
                </Button>
-               {/* Wrapped SettingsDialog to keep your existing component working */}
+               {/* Wrapped SettingsDialog to keep component working. */}
                <div className="h-14 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl flex items-center justify-center px-4 transition-colors cursor-pointer">
                  <SettingsDialog />
                </div>

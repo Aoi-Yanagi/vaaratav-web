@@ -99,7 +99,7 @@ export default function FaqSection() {
                 </div>
               </button>
 
-              {/* THE SMOOTH DROP-DOWN ANSWER */}
+              {/* DROP-DOWN ANSWER */}
               <AnimatePresence initial={false}>
                 {isOpen && (
                   <motion.div

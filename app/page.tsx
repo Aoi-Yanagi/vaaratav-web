@@ -27,7 +27,7 @@ export default function Home() {
 
  const startNewMeeting = async () => {
     if (!isLoggedIn) {
-      // Force them to login if they bypassed the UI lock
+      // SAFETY IF bypassed the UI lock (SIGN IN TO GITHUB)
       signIn("github");
       return;
     }
@@ -69,7 +69,7 @@ export default function Home() {
     { text: "No Downloads Required", icon: <Globe className="w-4 h-4 text-blue-400" /> },
   ];
 
-  // If NextAuth is still checking the database, show a clean black screen
+  // a clean black screen ,if NextAuth is still checking the database.
   if (status === "loading") {
     return <main className="min-h-[100dvh] bg-black" />;
   }

@@ -4,7 +4,7 @@ import GlobalNavigation from "@/components/ui/global-navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Calendar, Clock, Plus, Video, Users, Settings, MoreHorizontal } from "lucide-react";
-import { useSession } from "next-auth/react"; // <-- Import NextAuth
+import { useSession } from "next-auth/react";
 
 export default function Dashboard() {
   // Grab the live user session
@@ -13,9 +13,9 @@ export default function Dashboard() {
   // Extract user details securely
   const userName = session?.user?.name || "Guest User";
   const userImage = session?.user?.image;
-  // Get initials (e.g., "John Doe" -> "JD")
+  //initials Extraction
   const initials = userName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
-
+  //Dummy Content
   const upcomingMeetings = [
     { id: 1, title: "Team Standup", time: "10:00 AM", date: "Today", participants: 4 },
     { id: 2, title: "Project Review", time: "2:00 PM", date: "Tomorrow", participants: 8 },
@@ -35,7 +35,7 @@ export default function Dashboard() {
         {/* --- LEFT SIDEBAR (Quick Actions) --- */}
         <div className="w-full lg:w-1/4 space-y-6">
           
-          {/* User Profile Card (NOW DYNAMIC!) */}
+          {/* Dynamic User Profile Card */}
           <Card className="p-6 bg-neutral-900 border-neutral-800 flex items-center gap-4">
             {userImage ? (
               <img src={userImage} alt="Profile" className="h-12 w-12 rounded-full border-2 border-indigo-500/50" />

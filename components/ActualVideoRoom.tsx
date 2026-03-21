@@ -28,8 +28,6 @@ const VideoPlayer = ({ stream, isLocal, name, userRole }: { stream: MediaStream 
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
-      
-      // FIX: Force the browser to play the incoming stream to bypass strict Autoplay policies
       videoRef.current.play().catch((error) => {
          console.warn("Browser autoplay policy prevented video from starting automatically:", error);
       });
@@ -87,7 +85,7 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
     };
   }, [socket, roomCode, myName]);
 
- // 2. WEBRTC SIGNALING (The ICE Candidate Fix)
+ // 2. WEBRTC SIGNALING (using ICE Candidate)
   useEffect(() => {
     if (!socket) return;
 
@@ -105,7 +103,7 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
         setRemoteUsers((prev) => ({ ...prev, [userId]: { ...(prev[userId] || {}), stream: event.streams[0] } }));
       };
 
-      // FIX 1: We added caller: socket.id so the receiver knows who sent the ICE candidate!
+      //We added caller: socket.id so the receiver knows who sent the ICE candidate!
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
           socket.emit("ice-candidate", { 
@@ -137,7 +135,7 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
         setRemoteUsers((prev) => ({ ...prev, [data.caller]: { ...(prev[data.caller] || {}), stream: event.streams[0] } }));
       };
 
-      // FIX 2: Added caller: socket.id here too!
+      //Added caller: socket.id here too!
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
           socket.emit("ice-candidate", { 
@@ -163,7 +161,7 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
       if (peerConnection) await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
     });
 
-    // FIX 3: Added a safety try/catch block. Sometimes ICE candidates arrive a millisecond before the offer finishes processing.
+    //Added a safety try/catch block. Sometimes ICE candidates arrive a millisecond before the offer finishes processing.
     socket.on("ice-candidate", async (data: IceCandidateData) => {
       const peerConnection = peersRef.current[data.caller];
       if (peerConnection) {

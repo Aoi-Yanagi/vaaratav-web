@@ -24,10 +24,10 @@ export async function GET(
       return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
     }
 
-    // 2. Default role is Guest (Not logged in)
+    // 2. Default role: Guest(Not logged in)
     let role = "GUEST"; 
 
-    // 3. Check if they are logged in and determine their official role
+    // 3. Check for login session and determine their official role
     if (session?.user?.email) {
       const user = await prisma.user.findUnique({
         where: { email: session.user.email },
@@ -37,7 +37,7 @@ export async function GET(
         if (user.id === meeting.hostId) {
           role = "HOST";
         } else {
-          // You can expand this later to check a "Moderators" array in the DB
+          //currently limited to participant(MODERATORS ROLE LATER ON)
           role = "PARTICIPANT"; 
         }
       }

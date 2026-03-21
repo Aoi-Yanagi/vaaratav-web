@@ -20,10 +20,9 @@ export const useSocket = () => {
 export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false);
 
-  // FIX: Initialize socket lazily inside useState.
   // This runs exactly once when the component mounts, avoiding the "cascading render" error.
   const [socket] = useState(() => {
-    // Check if running on client-side to avoid SSR errors
+    // Checks if running on client-side to avoid SSR errors.
     if (typeof window !== 'undefined') {
       return io("https://vaaratav-socket.onrender.com"); 
     }
@@ -33,7 +32,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!socket) return;
 
-    // Define event handlers
+    // Define event handlers.
     const onConnect = () => {
       console.log("Socket connected:", socket.id);
       setIsConnected(true);
@@ -44,11 +43,11 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       setIsConnected(false);
     };
 
-    // Attach listeners
+    // Attach listeners.
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
 
-    // Cleanup on unmount
+    // Cleanup on unmount.
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);

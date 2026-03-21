@@ -1,4 +1,3 @@
-// components/3d/HeroGeometric.tsx
 "use client";
 
 import { useRef } from "react";

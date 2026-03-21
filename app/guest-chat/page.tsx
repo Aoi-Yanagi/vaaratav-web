@@ -34,7 +34,7 @@ export default function GuestChat() {
     }
 
     setTimeout(() => {
-        router.push('/'); // Redirecting back to home for a smooth exit
+        router.push('/'); // Redirecting to home.
     }, 600);
   };
 
@@ -48,6 +48,7 @@ export default function GuestChat() {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft]); 
+    //above comment used to avoid cascading errors in "endSession()"
 
   // 2. GET MEDIA
   useEffect(() => {
@@ -87,7 +88,7 @@ export default function GuestChat() {
     };
   }, [socket]); 
 
-  // Toggle Helpers
+  // Toggle Helpers.
   const toggleMic = () => {
     if (streamRef.current) {
         const track = streamRef.current.getAudioTracks()[0];
@@ -117,12 +118,12 @@ export default function GuestChat() {
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       className="flex flex-col items-center min-h-[100dvh] bg-zinc-950 text-zinc-100 font-sans relative overflow-hidden selection:bg-indigo-500/30"
     >
-      {/* Premium Background Orbs (Matches your Landing Page) */}
+      {/* Background Orbs (to match Landing Page) */}
       <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-cyan-600/20 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
       <div className="absolute inset-0 bg-[url('/noise.png')] opacity-20 mix-blend-overlay pointer-events-none" /> {/* Optional: Add a subtle noise texture if you have one */}
 
-      {/* Floating Header Pill */}
+      {/* Floating Header Pill. */}
       <motion.header 
         initial={{ y: -40, opacity: 0, scale: 0.95 }}
         animate={{ y: 0, opacity: 1, scale: 1 }}
@@ -149,7 +150,7 @@ export default function GuestChat() {
         </Button>
       </motion.header>
 
-      {/* Main Video Container */}
+      {/* Main Video Container. */}
       <div className="flex-1 flex flex-col items-center justify-center w-full max-w-5xl p-4 sm:p-6 z-10">
         
         <motion.div 
@@ -158,7 +159,7 @@ export default function GuestChat() {
           transition={{ delay: 0.3, duration: 0.8, type: "spring", bounce: 0.3 }}
           className="relative w-full aspect-video bg-zinc-900/50 backdrop-blur-sm rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl group"
         >
-            {/* The Video Stream */}
+            {/* The Video Stream. */}
             <video 
                 ref={videoRef} 
                 autoPlay 
@@ -167,7 +168,7 @@ export default function GuestChat() {
                 className={`w-full h-full object-cover transition-opacity duration-700 ${!isCamOn ? 'opacity-0' : 'opacity-100'}`} 
             />
             
-            {/* Camera Off State */}
+            {/* Camera Off State. */}
             <AnimatePresence>
                 {!isCamOn && (
                     <motion.div 
@@ -184,7 +185,7 @@ export default function GuestChat() {
                 )}
             </AnimatePresence>
 
-            {/* Floating Control Dock (macOS Style) */}
+            {/* Floating Control Dock. */}
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 p-2 bg-zinc-950/60 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-500">
                 <Button 
                     size="icon"
@@ -203,7 +204,7 @@ export default function GuestChat() {
             </div>
         </motion.div>
 
-        {/* Minimalist Connection Info Pill */}
+        {/* Connection Info Pill. */}
         <motion.div 
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -214,7 +215,7 @@ export default function GuestChat() {
                 <Activity className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Socket: {socket?.id ? socket.id.substring(0, 8) + '...' : 'Connecting'}</span>
             </div>
-            <div className="w-1 h-1 rounded-full bg-white/20" /> {/* Dot separator */}
+            <div className="w-1 h-1 rounded-full bg-white/20" /> {/* Dot separator. */}
             <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                 <span>E2E Encrypted</span>

@@ -5,7 +5,6 @@ import {
   Mic, MicOff, Video, VideoOff, 
   PhoneOff, MessageSquare, MonitorUp, Send, X
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/components/providers/SocketProvider";
@@ -41,7 +40,7 @@ export default function MeetingRoom({ roomId = "test-room" }: { roomId?: string 
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null); 
 
-  // 1. Initialize Media & Join (UNCHANGED)
+  // 1. Initialize Media & Join
   useEffect(() => {
     const startMedia = async () => {
       try {
@@ -69,7 +68,7 @@ export default function MeetingRoom({ roomId = "test-room" }: { roomId?: string 
     };
   }, [socket, isConnected, roomId]);
 
-  // 2. WebRTC & Socket Chat Logic (UNCHANGED)
+  // 2. WebRTC & Socket Chat Logic
   useEffect(() => {
     if (!socket) return;
 
@@ -285,7 +284,7 @@ export default function MeetingRoom({ roomId = "test-room" }: { roomId?: string 
         </AnimatePresence>
       </div>
 
-      {/* --- CHAT SIDEBAR (Framer Motion Upgraded) --- */}
+      {/* --- CHAT SIDEBAR --- */}
       <AnimatePresence>
         {isSidebarOpen && (
           <motion.div 
@@ -389,7 +388,7 @@ export default function MeetingRoom({ roomId = "test-room" }: { roomId?: string 
           className={cn("p-4 rounded-full transition-all duration-300 relative", isSidebarOpen ? "bg-cyan-500/20 text-cyan-400" : "bg-white/10 text-white hover:bg-white/20")}
         >
           <MessageSquare className="w-5 h-5" />
-          {/* Notification Dot (Optional) */}
+          {/* Notification Dot */}
           {messages.length > 0 && !isSidebarOpen && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-indigo-500 rounded-full border-2 border-neutral-900" />}
         </button>
 

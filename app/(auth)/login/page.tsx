@@ -31,7 +31,7 @@ export default function LoginPage() {
           <Link href="/signup" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
             Sign up here
           </Link>
-        </p>
+        </p>{/** No error just js being strict */}
       </Card>
     </div>
   );

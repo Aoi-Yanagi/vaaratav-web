@@ -3,8 +3,7 @@ import GithubProvider from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
 
-// This prevents Next.js from crashing your database with too many connections during hot-reloads
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const globalForPrisma = global as unknown as { prisma: PrismaClient }; // prevents Next.js from crashing database with too many connections during hot-reloads
 const prisma = globalForPrisma.prisma || new PrismaClient();
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
@@ -20,7 +19,7 @@ const handler = NextAuth({
     strategy: "jwt", // Forces secure cookie-based sessions
   },
   pages: {
-    signIn: '/login', // Tells NextAuth to use your custom login page
+    signIn: '/login', // redirect to custom login page
   },
 });
 

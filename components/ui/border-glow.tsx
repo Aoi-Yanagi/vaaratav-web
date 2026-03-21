@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 
 interface BorderGlowProps {
-  color?: string; // e.g. "from-indigo-400"
+  color?: string;
 }
 
 export default function BorderGlow({ color = "from-indigo-500 via-cyan-400 to-indigo-500" }: BorderGlowProps) {
@@ -20,8 +20,8 @@ export default function BorderGlow({ color = "from-indigo-500 via-cyan-400 to-in
       <svg
         className="absolute inset-0 h-full w-full"
         xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 100 100" // Define a coordinate system
-        preserveAspectRatio="none" // Stretch the mask to fit the container
+        viewBox="0 0 100 100" // Defining a coordinate system
+        preserveAspectRatio="none" // Stretching the mask to fit the container
       >
         <defs>
           <linearGradient id="glow-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -37,13 +37,13 @@ export default function BorderGlow({ color = "from-indigo-500 via-cyan-400 to-in
               y="-2"
               width="104"
               height="104"
-              rx="6" // Match the card's rounded corner radius (approx)
+              rx="6" // Match the card's rounded corner radius (approx.)
               fill="none"
               stroke="url(#glow-gradient)"
               strokeWidth="4"
               strokeDasharray="50 300" // Length of the glow segment, total path length
               
-              // This provides the movement!
+              // To provide the movement!
               animate={{
                 strokeDashoffset: [0, -350], // Moves the dashed line around the entire path
               }}
