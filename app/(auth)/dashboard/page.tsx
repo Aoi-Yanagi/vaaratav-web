@@ -45,7 +45,7 @@ export default function Dashboard() {
             )}
             <div>
               <h3 className="font-semibold">{userName}</h3>
-              <p className="text-sm text-gray-400">Pro Member</p>
+              <p className="text-sm text-gray-400">This is Dummy Dashboard 🤫(Development Only)</p>
             </div>
           </Card>
 
