@@ -70,9 +70,8 @@ export default function Home() {
     { text: "No Downloads Required", icon: <Globe className="w-4 h-4 text-blue-400" /> },
   ];
 
-
   if (status === "loading" && !showWelcome) {
-    return <main className="min-h-[100dvh] bg-black" />;
+    return <main className="min-h-[100dvh] bg-[#050505]" />;
   }
 
   return (
@@ -83,13 +82,12 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* Main Content Rendered Only After Animation Starts Exiting */}
       {!showWelcome && (
         <motion.main 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8 }}
-          className="relative min-h-[100dvh] bg-black text-white selection:bg-indigo-500/30 overflow-hidden"
+          initial={{ opacity: 0, scale: 1.05, filter: "blur(15px)" }}
+          animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+          className="relative min-h-[100dvh] bg-[#050505] text-white selection:bg-indigo-500/30 overflow-hidden"
         >
           <GlobalNavigation />
 
@@ -116,11 +114,20 @@ export default function Home() {
                   ))}
                 </motion.div>
 
-                <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8, duration: 0.6 }} className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight">
+                <motion.h1 
+                  initial={{ opacity: 0, y: 30 }} 
+                  animate={{ opacity: 1, y: 0 }} 
+                  transition={{ delay: 0.6, duration: 0.8, ease: "easeOut" }} 
+                  className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight"
+                >
                   Connect with Anyone. <br />
-                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-500">
+                  <motion.span 
+                    animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                    transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                    className="bg-[length:200%_auto] bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-cyan-200 to-indigo-500 inline-block pb-2"
+                  >
                     Amplify Your Reach.
-                  </span>
+                  </motion.span>
                 </motion.h1>
 
                 <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.0 }} className="mt-6 text-lg md:text-xl text-gray-400 max-w-2xl">
@@ -130,27 +137,36 @@ export default function Home() {
                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 1.2, type: "spring" }} className="mt-12 w-full max-w-2xl relative">
                   
                   <div className={`relative transition-all duration-500 ${!isLoggedIn ? 'opacity-50 grayscale blur-[2px] pointer-events-none select-none' : ''}`}>
-                      <Card className="p-3 bg-white/5 border-white/10 backdrop-blur-xl flex flex-col sm:flex-row gap-3 shadow-2xl shadow-indigo-900/20 rounded-2xl">
-                        <Button size="lg" className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 h-14 text-base font-semibold transition-all rounded-xl" onClick={startNewMeeting} disabled={isCreating}>
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/30 to-cyan-500/30 rounded-[1.25rem] blur opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
+                    
+                    <Card className="relative p-3 bg-black/40 border border-white/10 backdrop-blur-2xl flex flex-col sm:flex-row gap-3 shadow-[0_8px_32px_0_rgba(31,38,135,0.2)] rounded-2xl group">
+                      
+                      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto">
+                        <Button size="lg" className="w-full bg-indigo-600 hover:bg-indigo-500 h-14 text-base font-semibold shadow-[0_0_15px_rgba(79,70,229,0.5)] transition-all rounded-xl border border-indigo-400/20" onClick={startNewMeeting} disabled={isCreating}>
                           <Video className="w-5 h-5 mr-2" />
                           {isCreating ? 'Creating...' : 'New Meeting'}
                         </Button>
-                        <div className="flex-1 flex gap-2">
-                          <div className="relative flex-1">
-                            <Keyboard className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                            <Input 
-                              placeholder="Enter meeting code" 
-                              className="pl-12 h-14 bg-black/40 border-white/10 text-white placeholder:text-gray-500 focus-visible:ring-indigo-500 text-lg rounded-xl"
-                              value={meetingCode}
-                              onChange={(e) => setMeetingCode(e.target.value)}
-                              onKeyDown={(e) => e.key === "Enter" && joinMeeting()}
-                            />
-                          </div>
-                          <Button size="lg" variant="secondary" className="h-14 px-8 font-semibold bg-white text-black hover:bg-gray-200 rounded-xl" disabled={!meetingCode} onClick={joinMeeting}>
+                      </motion.div>
+
+                      <div className="flex-1 flex gap-2">
+                        <div className="relative flex-1 group/input">
+                          <Keyboard className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within/input:text-indigo-400 transition-colors" />
+                          <Input 
+                            placeholder="Enter meeting code" 
+                            className="pl-12 h-14 bg-white/5 border-white/5 text-white placeholder:text-gray-600 focus-visible:ring-1 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500/50 text-lg rounded-xl transition-all"
+                            value={meetingCode}
+                            onChange={(e) => setMeetingCode(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && joinMeeting()}
+                          />
+                        </div>
+                        
+                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                          <Button size="lg" variant="secondary" className="h-14 px-8 font-semibold bg-white/10 text-white hover:bg-white/20 border border-white/10 backdrop-blur-md rounded-xl transition-all" disabled={!meetingCode} onClick={joinMeeting}>
                             Join
                           </Button>
-                        </div>
-                      </Card>
+                        </motion.div>
+                      </div>
+                    </Card>
                   </div>
 
                   {!isLoggedIn && (
