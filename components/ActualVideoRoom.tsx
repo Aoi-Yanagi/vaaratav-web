@@ -10,8 +10,8 @@ import { motion, AnimatePresence } from "framer-motion";
 type RemoteUser = { stream?: MediaStream; name?: string; role?: string; };
 interface ActualVideoRoomProps { roomCode: string; role: "HOST" | "PARTICIPANT" | "GUEST" | null; user?: { name?: string | null; email?: string | null; image?: string | null } | null; }
 
-type OfferData = { caller: string; offer: RTCSessionDescriptionInit; callerName: string; callerRole: string; roomId: string; };
-type AnswerData = { caller: string; answer: RTCSessionDescriptionInit; callerName: string; callerRole: string; roomId: string; };
+type OfferData = { target: string; caller: string; offer: RTCSessionDescriptionInit; callerName: string; callerRole: string; roomId: string; };
+type AnswerData = { target: string; caller: string; answer: RTCSessionDescriptionInit; callerName: string; callerRole: string; roomId: string; };
 type IceCandidateData = { target: string; caller: string; candidate: RTCIceCandidateInit; roomId: string; };
 type CommandMessage = { type: "MUTE_ALL" | "KICK"; targetId?: string; };
 
@@ -42,6 +42,7 @@ const VideoPlayer = ({ stream, isLocal, name, userRole }: { stream: MediaStream 
 
 export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) {
   const { socket } = useSocket();
+  
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const hasJoinedRef = useRef(false); 
@@ -52,28 +53,16 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
   const [showParticipants, setShowParticipants] = useState(false);
   
   const peersRef = useRef<{ [id: string]: RTCPeerConnection }>({});
-  const myName = user?.name || "Anonymous Guest";
-
-  // --- OPTIMIZATION: SHARED BITRATE THROTTLER ---
-  const applyBandwidthLimit = async (peerConnection: RTCPeerConnection) => {
-    const senders = peerConnection.getSenders();
-    const videoSender = senders.find(s => s.track?.kind === 'video');
-    if (videoSender) {
-        const params = videoSender.getParameters();
-        if (!params.encodings) params.encodings = [{}];
-        // Limit upload to 400 kbps per peer to ensure network stability
-        params.encodings[0].maxBitrate = 400 * 1000; 
-        try {
-            await videoSender.setParameters(params);
-        } catch (e) {
-            console.log("Bitrate throttling unsupported by browser, continuing normally.");
-        }
-    }
-  };
+  
+  // FIX 1: The ICE Candidate Queue
+  const pendingCandidates = useRef<{ [id: string]: RTCIceCandidateInit[] }>({});
+  
+  const myName = user?.name || "Guest User";
 
   // 1. GET CAMERA & JOIN ROOM
   useEffect(() => {
-    if (!socket || hasJoinedRef.current) return;
+    // Crucial: Ensure socket exists AND has fully connected (has an ID) before joining
+    if (!socket || !socket.id || hasJoinedRef.current) return;
 
     const startMedia = async () => {
       try {
@@ -97,16 +86,12 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
     };
   }, [socket, roomCode, myName]);
 
-  // --- OPTIMIZATION: PAGE VISIBILITY CPU SAVER ---
+  // Tab Visibility CPU Saver
   useEffect(() => {
     const handleVisibilityChange = () => {
         if (localStreamRef.current) {
             const videoTrack = localStreamRef.current.getVideoTracks()[0];
-            if (videoTrack) {
-                // If tab is hidden, stop encoding video to save CPU.
-                // If they come back, only turn it on if they hadn't muted their camera.
-                videoTrack.enabled = document.hidden ? false : isCamOn;
-            }
+            if (videoTrack) videoTrack.enabled = document.hidden ? false : isCamOn;
         }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -114,9 +99,9 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
   }, [isCamOn]);
 
 
- // 2. WEBRTC SIGNALING
+ // 2. WEBRTC SIGNALING (The Brains)
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !socket.id) return;
 
     socket.on("user-connected", async (userId: string, userName: string) => {
       const peerConnection = new RTCPeerConnection(ICE_SERVERS);
@@ -126,7 +111,6 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
 
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => peerConnection.addTrack(track, localStreamRef.current!));
-        applyBandwidthLimit(peerConnection); // Throttle upload
       }
 
       peerConnection.ontrack = (event) => {
@@ -146,6 +130,9 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
     });
 
     socket.on("offer", async (data: OfferData) => {
+      // FIX 2: Target Filtering. Ignore offers not meant for us!
+      if (data.target !== socket.id) return;
+
       const peerConnection = new RTCPeerConnection(ICE_SERVERS);
       peersRef.current[data.caller] = peerConnection;
 
@@ -153,7 +140,6 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
 
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => peerConnection.addTrack(track, localStreamRef.current!));
-        applyBandwidthLimit(peerConnection); // Throttle upload
       }
 
       peerConnection.ontrack = (event) => {
@@ -167,6 +153,13 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
       };
 
       await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+      
+      // Process any queued ICE candidates that arrived early
+      if (pendingCandidates.current[data.caller]) {
+          pendingCandidates.current[data.caller].forEach(c => peerConnection.addIceCandidate(new RTCIceCandidate(c)).catch(e=>console.log(e)));
+          pendingCandidates.current[data.caller] = [];
+      }
+
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
       
@@ -174,20 +167,38 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
     });
 
     socket.on("answer", async (data: AnswerData) => {
+      // Ignore answers not meant for us
+      if (data.target !== socket.id) return;
+
       setRemoteUsers(prev => ({ ...prev, [data.caller]: { ...(prev[data.caller] || {}), name: data.callerName, role: data.callerRole } }));
       
       const peerConnection = peersRef.current[data.caller];
-      if (peerConnection) await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+      if (peerConnection) {
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+          
+          // Process any queued ICE candidates
+          if (pendingCandidates.current[data.caller]) {
+              pendingCandidates.current[data.caller].forEach(c => peerConnection.addIceCandidate(new RTCIceCandidate(c)).catch(e=>console.log(e)));
+              pendingCandidates.current[data.caller] = [];
+          }
+      }
     });
 
     socket.on("ice-candidate", async (data: IceCandidateData) => {
+      // Ignore candidates not meant for us
+      if (data.target !== socket.id) return;
+
       const peerConnection = peersRef.current[data.caller];
-      if (peerConnection) {
+      if (peerConnection && peerConnection.remoteDescription) {
         try {
           await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
         } catch (e) {
           console.log("Safely caught ICE timing race condition", e);
         }
+      } else {
+        // The connection isn't ready yet! Store it in the queue for later.
+        if (!pendingCandidates.current[data.caller]) pendingCandidates.current[data.caller] = [];
+        pendingCandidates.current[data.caller].push(data.candidate);
       }
     });
 
@@ -212,7 +223,7 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
     };
   }, [socket, roomCode, myName, role]);
 
-  // 3. HOST CONTROLS & SECURE HARDWARE TEARDOWN
+  // 3. HOST CONTROLS
   useEffect(() => {
     if (!socket) return;
 
@@ -225,8 +236,6 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
         }
       }
       if (msg.type === "KICK" && msg.targetId === socket.id) {
-        // --- OPTIMIZATION: Hard Teardown ---
-        // Ensure hardware lights turn off instantly when kicked!
         if (localStreamRef.current) {
             localStreamRef.current.getTracks().forEach(track => track.stop());
         }
