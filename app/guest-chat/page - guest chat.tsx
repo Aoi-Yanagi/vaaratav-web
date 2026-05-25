@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Timer, X, Mic, MicOff, Video as VideoIcon, VideoOff, ShieldCheck, Activity } from "lucide-react";
+import { Timer, X, Mic, MicOff, Video as VideoIcon, VideoOff, ShieldCheck, Activity, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function GuestChat() {
+// Accept a unique roomId via props or URL parameters to isolate sessions
+export default function GuestChat({ roomId = "fallback-room-id" }) {
   const router = useRouter();
   const { socket } = useSocket();
   
@@ -24,18 +25,35 @@ export default function GuestChat() {
   const endSession = () => {
     setIsClosing(true);
     
+    // Stop all media tracks safely
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null; 
     }
 
+    // Clear the video element to free up memory
+    if (videoRef.current) {
+        videoRef.current.srcObject = null;
+    }
+
+    // Leave the specific isolated room
     if (socket) {
-        socket.emit("leave-room", "guest-lobby"); 
+        socket.emit("leave-room", roomId); 
     }
 
     setTimeout(() => {
         router.push('/'); // Redirecting to home.
     }, 600);
+  };
+
+  // --- REPORT ABUSE FUNCTION ---
+  const handleReportAbuse = () => {
+    if (socket) {
+        // Emit a flag to your backend to log the peers in this room for review/banning
+        socket.emit("report-abuse", { roomId, reason: "Inappropriate behavior" });
+    }
+    // Immediately terminate the session for the victim's safety
+    endSession();
   };
 
   // 1. COUNTDOWN TIMER
@@ -48,9 +66,8 @@ export default function GuestChat() {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft]); 
-    //above comment used to avoid cascading errors in "endSession()"
 
-  // 2. GET MEDIA
+  // 2. GET MEDIA & JOIN SECURE ROOM
   useEffect(() => {
     let isMounted = true; 
 
@@ -70,10 +87,12 @@ export default function GuestChat() {
         }
         
         if (socket) {
-            socket.emit("join-room", "guest-lobby", "guest-user", "Anonymous Guest");
+            // Join a UNIQUE room, not a global lobby
+            socket.emit("join-room", roomId, "guest-user", "Anonymous Guest");
         }
       } catch (err) {
         console.error("Failed to get media", err);
+        // Tip: You might want to show a UI error here if the user blocks camera access
       }
     };
 
@@ -85,8 +104,11 @@ export default function GuestChat() {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
       }
+      if (videoRef.current) {
+          videoRef.current.srcObject = null;
+      }
     };
-  }, [socket]); 
+  }, [socket, roomId]); 
 
   // Toggle Helpers.
   const toggleMic = () => {
@@ -118,10 +140,10 @@ export default function GuestChat() {
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       className="flex flex-col items-center min-h-[100dvh] bg-zinc-950 text-zinc-100 font-sans relative overflow-hidden selection:bg-indigo-500/30"
     >
-      {/* Background Orbs (to match Landing Page) */}
+      {/* Background Effects */}
       <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-cyan-600/20 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
-      <div className="absolute inset-0 bg-[url('/noise.png')] opacity-20 mix-blend-overlay pointer-events-none" /> {/* Optional: Add a subtle noise texture if you have one */}
+      <div className="absolute inset-0 bg-[url('/noise.png')] opacity-20 mix-blend-overlay pointer-events-none" />
 
       {/* Floating Header Pill. */}
       <motion.header 
@@ -140,19 +162,31 @@ export default function GuestChat() {
           {formatTime(timeLeft)}
         </div>
 
-        <Button 
-            variant="ghost" 
-            onClick={endSession} 
-            className="group px-5 py-2.5 bg-white/5 hover:bg-red-500/20 border border-white/10 hover:border-red-500/30 text-zinc-300 hover:text-red-400 rounded-full transition-all duration-300"
-        >
-          <X className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform duration-300" /> 
-          <span className="font-medium">Leave</span>
-        </Button>
+        <div className="flex items-center gap-2">
+            {/* NEW: Report Button */}
+            <Button 
+                variant="ghost" 
+                onClick={handleReportAbuse} 
+                className="group px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 text-red-400 rounded-full transition-all duration-300"
+                title="Report user and leave"
+            >
+                <AlertTriangle className="w-4 h-4 mr-2" /> 
+                <span className="font-medium hidden sm:block">Report</span>
+            </Button>
+
+            <Button 
+                variant="ghost" 
+                onClick={endSession} 
+                className="group px-5 py-2.5 bg-white/5 hover:bg-zinc-800 border border-white/10 text-zinc-300 rounded-full transition-all duration-300"
+            >
+                <X className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform duration-300" /> 
+                <span className="font-medium">Leave</span>
+            </Button>
+        </div>
       </motion.header>
 
       {/* Main Video Container. */}
       <div className="flex-1 flex flex-col items-center justify-center w-full max-w-5xl p-4 sm:p-6 z-10">
-        
         <motion.div 
           initial={{ y: 40, opacity: 0, scale: 0.95 }}
           animate={{ y: 0, opacity: 1, scale: isClosing ? 0.9 : 1 }}
@@ -215,10 +249,11 @@ export default function GuestChat() {
                 <Activity className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Socket: {socket?.id ? socket.id.substring(0, 8) + '...' : 'Connecting'}</span>
             </div>
-            <div className="w-1 h-1 rounded-full bg-white/20" /> {/* Dot separator. */}
+            <div className="w-1 h-1 rounded-full bg-white/20" />
             <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                <span>E2E Encrypted</span>
+                {/* Corrected phrasing to reflect standard WebRTC security accurately */}
+                <span>Secure Peer Connection</span> 
             </div>
         </motion.div>
 

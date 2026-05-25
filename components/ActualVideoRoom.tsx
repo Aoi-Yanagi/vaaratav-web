@@ -12,12 +12,7 @@ interface ActualVideoRoomProps { roomCode: string; role: "HOST" | "PARTICIPANT" 
 
 type OfferData = { caller: string; offer: RTCSessionDescriptionInit; callerName: string; callerRole: string; roomId: string; };
 type AnswerData = { caller: string; answer: RTCSessionDescriptionInit; callerName: string; callerRole: string; roomId: string; };
-type IceCandidateData = { 
-  target: string;
-  caller: string; 
-  candidate: RTCIceCandidateInit; 
-  roomId: string; 
-};
+type IceCandidateData = { target: string; caller: string; candidate: RTCIceCandidateInit; roomId: string; };
 type CommandMessage = { type: "MUTE_ALL" | "KICK"; targetId?: string; };
 
 const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }] };
@@ -29,7 +24,7 @@ const VideoPlayer = ({ stream, isLocal, name, userRole }: { stream: MediaStream 
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
       videoRef.current.play().catch((error) => {
-         console.warn("Browser autoplay policy prevented video from starting automatically:", error);
+         console.warn("Browser autoplay policy prevented video:", error);
       });
     }
   }, [stream]);
@@ -49,7 +44,7 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
   const { socket } = useSocket();
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const hasJoinedRef = useRef(false); // <-- Prevents Strict Mode double-emit
+  const hasJoinedRef = useRef(false); 
   
   const [remoteUsers, setRemoteUsers] = useState<{ [id: string]: RemoteUser }>({});
   const [isMicOn, setIsMicOn] = useState(true);
@@ -58,6 +53,23 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
   
   const peersRef = useRef<{ [id: string]: RTCPeerConnection }>({});
   const myName = user?.name || "Anonymous Guest";
+
+  // --- OPTIMIZATION: SHARED BITRATE THROTTLER ---
+  const applyBandwidthLimit = async (peerConnection: RTCPeerConnection) => {
+    const senders = peerConnection.getSenders();
+    const videoSender = senders.find(s => s.track?.kind === 'video');
+    if (videoSender) {
+        const params = videoSender.getParameters();
+        if (!params.encodings) params.encodings = [{}];
+        // Limit upload to 400 kbps per peer to ensure network stability
+        params.encodings[0].maxBitrate = 400 * 1000; 
+        try {
+            await videoSender.setParameters(params);
+        } catch (e) {
+            console.log("Bitrate throttling unsupported by browser, continuing normally.");
+        }
+    }
+  };
 
   // 1. GET CAMERA & JOIN ROOM
   useEffect(() => {
@@ -85,7 +97,24 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
     };
   }, [socket, roomCode, myName]);
 
- // 2. WEBRTC SIGNALING (using ICE Candidate)
+  // --- OPTIMIZATION: PAGE VISIBILITY CPU SAVER ---
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+        if (localStreamRef.current) {
+            const videoTrack = localStreamRef.current.getVideoTracks()[0];
+            if (videoTrack) {
+                // If tab is hidden, stop encoding video to save CPU.
+                // If they come back, only turn it on if they hadn't muted their camera.
+                videoTrack.enabled = document.hidden ? false : isCamOn;
+            }
+        }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [isCamOn]);
+
+
+ // 2. WEBRTC SIGNALING
   useEffect(() => {
     if (!socket) return;
 
@@ -97,21 +126,16 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
 
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => peerConnection.addTrack(track, localStreamRef.current!));
+        applyBandwidthLimit(peerConnection); // Throttle upload
       }
 
       peerConnection.ontrack = (event) => {
         setRemoteUsers((prev) => ({ ...prev, [userId]: { ...(prev[userId] || {}), stream: event.streams[0] } }));
       };
 
-      //We added caller: socket.id so the receiver knows who sent the ICE candidate!
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-          socket.emit("ice-candidate", { 
-            target: userId, 
-            caller: socket.id, 
-            candidate: event.candidate, 
-            roomId: roomCode 
-          });
+          socket.emit("ice-candidate", { target: userId, caller: socket.id, candidate: event.candidate, roomId: roomCode });
         }
       };
 
@@ -129,21 +153,16 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
 
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => peerConnection.addTrack(track, localStreamRef.current!));
+        applyBandwidthLimit(peerConnection); // Throttle upload
       }
 
       peerConnection.ontrack = (event) => {
         setRemoteUsers((prev) => ({ ...prev, [data.caller]: { ...(prev[data.caller] || {}), stream: event.streams[0] } }));
       };
 
-      //Added caller: socket.id here too!
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-          socket.emit("ice-candidate", { 
-            target: data.caller, 
-            caller: socket.id, 
-            candidate: event.candidate, 
-            roomId: roomCode 
-          });
+          socket.emit("ice-candidate", { target: data.caller, caller: socket.id, candidate: event.candidate, roomId: roomCode });
         }
       };
 
@@ -161,7 +180,6 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
       if (peerConnection) await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
     });
 
-    //Added a safety try/catch block. Sometimes ICE candidates arrive a millisecond before the offer finishes processing.
     socket.on("ice-candidate", async (data: IceCandidateData) => {
       const peerConnection = peersRef.current[data.caller];
       if (peerConnection) {
@@ -194,7 +212,7 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
     };
   }, [socket, roomCode, myName, role]);
 
-  // 3. HOST CONTROLS
+  // 3. HOST CONTROLS & SECURE HARDWARE TEARDOWN
   useEffect(() => {
     if (!socket) return;
 
@@ -207,6 +225,11 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
         }
       }
       if (msg.type === "KICK" && msg.targetId === socket.id) {
+        // --- OPTIMIZATION: Hard Teardown ---
+        // Ensure hardware lights turn off instantly when kicked!
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(track => track.stop());
+        }
         alert("You have been removed from the meeting by the Host.");
         window.location.href = "/";
       }
@@ -240,6 +263,13 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
     }
   };
 
+  const handleLeave = () => {
+     if (localStreamRef.current) {
+         localStreamRef.current.getTracks().forEach(track => track.stop());
+     }
+     window.location.href = '/meeting-ended';
+  };
+
   return (
     <div className="flex w-full h-full bg-black relative overflow-hidden font-sans">
       <div className={`flex flex-col flex-1 transition-all duration-300 ${showParticipants ? 'mr-80' : 'mr-0'}`}>
@@ -270,7 +300,7 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
             {isCamOn ? <VideoIcon className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
           </Button>
           <div className="w-px h-8 bg-white/10 mx-2" />
-          <Button onClick={() => window.location.href = '/'} className="bg-red-500 hover:bg-red-600 text-white rounded-2xl px-8 h-14 font-bold tracking-wide shadow-[0_0_20px_rgba(239,68,68,0.4)] transition-transform active:scale-95">
+          <Button onClick={handleLeave} className="bg-red-500 hover:bg-red-600 text-white rounded-2xl px-8 h-14 font-bold tracking-wide shadow-[0_0_20px_rgba(239,68,68,0.4)] transition-transform active:scale-95">
             <PhoneOff className="w-5 h-5 mr-2" /> Leave
           </Button>
         </div>

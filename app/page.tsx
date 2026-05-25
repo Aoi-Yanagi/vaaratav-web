@@ -26,6 +26,7 @@ export default function Home() {
 
   const { data: session, status } = useSession();
   const isLoggedIn = !!session;
+  
 
   const startNewMeeting = async () => {
     if (!isLoggedIn) {
@@ -52,7 +53,11 @@ export default function Home() {
       router.push(`/meeting/${meetingCode}`);
     }
   };
-
+const startGuestSession = () => {
+    // Generate a random 6-character room ID (e.g., "x7v9q2")
+    const uniqueRoomId = Math.random().toString(36).substring(2, 8).toLowerCase();
+    router.push(`/guest-chat/${uniqueRoomId}`);
+  };
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.20, delayChildren: 0.35 } }
@@ -190,7 +195,7 @@ export default function Home() {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }} className="mt-8 mb-32">
                   <div className="flex flex-col items-center gap-3">
                       <span className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Or try instantly</span>
-                      <Button variant="outline" className="border-white/20 hover:bg-white/10 text-white bg-transparent" onClick={() => router.push('/guest-chat')}>
+                      <Button variant="outline" className="border-white/20 hover:bg-white/10 text-white bg-transparent" onClick={startGuestSession}>
                         <Zap className="w-4 h-4 mr-2" /> 
                         Start 5-Min Guest Chat
                       </Button>
