@@ -86,18 +86,6 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
     };
   }, [socket, roomCode, myName]);
 
-  // Tab Visibility CPU Saver
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-        if (localStreamRef.current) {
-            const videoTrack = localStreamRef.current.getVideoTracks()[0];
-            if (videoTrack) videoTrack.enabled = document.hidden ? false : isCamOn;
-        }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [isCamOn]);
-
 
  // 2. WEBRTC SIGNALING (The Brains)
   useEffect(() => {
