@@ -16,29 +16,33 @@ type IceCandidateData = { target: string; caller: string; candidate: RTCIceCandi
 
 type CommandMessage = 
   | { type: "MUTE_ALL" | "KICK"; targetId?: string; }
-  | { type: "REACTION"; emoji: string; senderName: string; id: string; };
+  | { type: "REACTION"; emoji: string; senderName: string; id: string; }
+  | { type: "SCREEN_SHARE_START" | "SCREEN_SHARE_STOP"; senderId: string; };
 
-// UPDATED: Pre-calculate start and end coordinates for React purity
 type Reaction = { id: string; emoji: string; name: string; startX: number; endX: number };
 
 const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }] };
-const EMOJIS = ["👍", "❤️", "😂", "👏", "🎉", "🔥"];
+const EMOJIS = ["👍", "❤️", "😂", "😮", "🎉", "🔥", "💯"];
 
-const VideoPlayer = ({ stream, isLocal, name, userRole }: { stream: MediaStream | null, isLocal: boolean, name: string, userRole: string }) => {
+const VideoPlayer = ({ stream, isLocal, name, userRole, isSpotlight = false }: { stream: MediaStream | null, isLocal: boolean, name: string, userRole: string, isSpotlight?: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
-      videoRef.current.play().catch((error) => {
-         console.warn("Browser autoplay policy prevented video:", error);
-      });
+      videoRef.current.play().catch((e) => console.warn("Autoplay prevented:", e));
     }
   }, [stream]);
 
   return (
-    <div className="relative bg-zinc-900 rounded-3xl overflow-hidden border border-white/10 aspect-video shadow-2xl group">
-      <video ref={videoRef} autoPlay playsInline muted={isLocal} className="w-full h-full object-cover" />
+    <div className={`relative bg-zinc-900 rounded-3xl overflow-hidden border border-white/10 shadow-2xl group transition-all duration-500 ${isSpotlight ? 'w-full h-full' : 'aspect-video w-full'}`}>
+      <video 
+        ref={videoRef} 
+        autoPlay 
+        playsInline 
+        muted={isLocal} 
+        className={`w-full h-full object-cover ${isLocal && !isSpotlight ? 'scale-x-[-1]' : ''}`} 
+      />
       <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-lg z-10">
         <span className="text-sm font-medium text-white">{name} {isLocal && "(You)"}</span>
         {userRole === "HOST" && <Crown className="w-4 h-4 text-amber-400 ml-1" />}
@@ -60,7 +64,9 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
   const [showParticipants, setShowParticipants] = useState(false);
   
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [presenterId, setPresenterId] = useState<string | null>(null); 
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
+  
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [showReactionMenu, setShowReactionMenu] = useState(false);
   
@@ -70,25 +76,17 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
   const myName = user?.name || "Guest User";
   const firstName = myName.split(" ")[0]; 
 
-
-  // --- FEATURE METHODS (Moved UP for ESLint Compliance) ---
-  
-  // Wrapped in useCallback so it maintains a stable reference for the useEffect array
+  // --- REACTION ENGINE ---
   const addReactionToScreen = useCallback((reactionData: {id: string, emoji: string, name: string}) => {
-    // FIX: Calculate pure static values before setting state to prevent render-phase Math.random() calls
-    const startX = Math.floor(Math.random() * 80) - 40;
-    const endX = startX + (Math.floor(Math.random() * 20) - 10);
+    const startX = Math.floor(Math.random() * 60) - 30;
+    const endX = startX + (Math.floor(Math.random() * 40) - 20);
     
     setReactions(prev => [...prev, { ...reactionData, startX, endX }]);
-    
-    setTimeout(() => {
-        setReactions(prev => prev.filter(r => r.id !== reactionData.id));
-    }, 3000);
+    setTimeout(() => setReactions(prev => prev.filter(r => r.id !== reactionData.id)), 3000);
   }, []);
 
   const sendReaction = (emoji: string) => {
-    // FIX: Standardize ID generation. Use crypto UUID if available, fallback to Date.now
-    const id = crypto.randomUUID(); 
+   const id = crypto.randomUUID(); 
   
   addReactionToScreen({ id, emoji, name: firstName }); 
   
@@ -97,7 +95,6 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
   }
   setShowReactionMenu(false);
   };
-
 
   // 1. GET CAMERA & JOIN ROOM
   useEffect(() => {
@@ -108,23 +105,17 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setLocalStream(stream);
         localStreamRef.current = stream;
-        
         socket.emit("join-room", roomCode, socket.id, myName);
         hasJoinedRef.current = true;
       } catch (error) {
         console.error("Error accessing media devices.", error);
       }
     };
-
     startMedia();
 
     return () => {
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (screenTrackRef.current) {
-        screenTrackRef.current.stop();
-      }
+      if (localStreamRef.current) localStreamRef.current.getTracks().forEach(track => track.stop());
+      if (screenTrackRef.current) screenTrackRef.current.stop();
     };
   }, [socket, roomCode, myName]);
 
@@ -133,71 +124,55 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
   useEffect(() => {
     if (!socket || !socket.id) return;
 
-    socket.on("user-connected", async (userId: string, userName: string) => {
+    // FIX: Removed unused parameters (isInitiator, offer)
+    const setupPeerConnection = (userId: string) => {
       const peerConnection = new RTCPeerConnection(ICE_SERVERS);
       peersRef.current[userId] = peerConnection;
-
-      setRemoteUsers(prev => ({ ...prev, [userId]: { ...(prev[userId] || {}), name: userName, role: "CONNECTING..." } }));
 
       const currentStream = isScreenSharing && screenTrackRef.current 
         ? new MediaStream([screenTrackRef.current, localStreamRef.current!.getAudioTracks()[0]])
         : localStreamRef.current;
 
-      if (currentStream) {
-        currentStream.getTracks().forEach((track) => peerConnection.addTrack(track, currentStream));
-      }
+      if (currentStream) currentStream.getTracks().forEach((track) => peerConnection.addTrack(track, currentStream));
 
       peerConnection.ontrack = (event) => {
         setRemoteUsers((prev) => ({ ...prev, [userId]: { ...(prev[userId] || {}), stream: event.streams[0] } }));
       };
 
       peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit("ice-candidate", { target: userId, caller: socket.id, candidate: event.candidate, roomId: roomCode });
-        }
+        if (event.candidate) socket.emit("ice-candidate", { target: userId, caller: socket.id, candidate: event.candidate, roomId: roomCode });
       };
 
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
+      return peerConnection;
+    };
+
+    socket.on("user-connected", async (userId: string, userName: string) => {
+      setRemoteUsers(prev => ({ ...prev, [userId]: { ...(prev[userId] || {}), name: userName, role: "CONNECTING..." } }));
+      
+      const pc = setupPeerConnection(userId);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
       
       socket.emit("offer", { target: userId, caller: socket.id, offer, roomId: roomCode, callerName: myName, callerRole: role || "GUEST" });
+      
+      if (isScreenSharing && socket.id) {
+          socket.emit("send-message", roomCode, { type: "SCREEN_SHARE_START", senderId: socket.id });
+      }
     });
 
     socket.on("offer", async (data: OfferData) => {
       if (data.target !== socket.id) return;
-
-      const peerConnection = new RTCPeerConnection(ICE_SERVERS);
-      peersRef.current[data.caller] = peerConnection;
-
       setRemoteUsers(prev => ({ ...prev, [data.caller]: { ...(prev[data.caller] || {}), name: data.callerName, role: data.callerRole } }));
-
-      const currentStream = isScreenSharing && screenTrackRef.current 
-        ? new MediaStream([screenTrackRef.current, localStreamRef.current!.getAudioTracks()[0]])
-        : localStreamRef.current;
-
-      if (currentStream) {
-        currentStream.getTracks().forEach((track) => peerConnection.addTrack(track, currentStream));
-      }
-
-      peerConnection.ontrack = (event) => {
-        setRemoteUsers((prev) => ({ ...prev, [data.caller]: { ...(prev[data.caller] || {}), stream: event.streams[0] } }));
-      };
-
-      peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit("ice-candidate", { target: data.caller, caller: socket.id, candidate: event.candidate, roomId: roomCode });
-        }
-      };
-
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
       
+      const pc = setupPeerConnection(data.caller);
+      
+      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
       if (pendingCandidates.current[data.caller]) {
-          pendingCandidates.current[data.caller].forEach(c => peerConnection.addIceCandidate(new RTCIceCandidate(c)).catch(e=>console.log(e)));
+          pendingCandidates.current[data.caller].forEach(c => pc.addIceCandidate(new RTCIceCandidate(c)).catch(e=>console.log(e)));
           pendingCandidates.current[data.caller] = [];
       }
-
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
       
       socket.emit("answer", { target: data.caller, caller: socket.id, answer, roomId: roomCode, callerName: myName, callerRole: role || "GUEST" });
     });
@@ -206,11 +181,11 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
       if (data.target !== socket.id) return;
       setRemoteUsers(prev => ({ ...prev, [data.caller]: { ...(prev[data.caller] || {}), name: data.callerName, role: data.callerRole } }));
       
-      const peerConnection = peersRef.current[data.caller];
-      if (peerConnection) {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+      const pc = peersRef.current[data.caller];
+      if (pc) {
+          await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
           if (pendingCandidates.current[data.caller]) {
-              pendingCandidates.current[data.caller].forEach(c => peerConnection.addIceCandidate(new RTCIceCandidate(c)).catch(e=>console.log(e)));
+              pendingCandidates.current[data.caller].forEach(c => pc.addIceCandidate(new RTCIceCandidate(c)).catch(e=>console.log(e)));
               pendingCandidates.current[data.caller] = [];
           }
       }
@@ -218,13 +193,9 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
 
     socket.on("ice-candidate", async (data: IceCandidateData) => {
       if (data.target !== socket.id) return;
-      const peerConnection = peersRef.current[data.caller];
-      if (peerConnection && peerConnection.remoteDescription) {
-        try {
-          await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-        } catch (e) {
-          console.log("Safely caught ICE timing race condition", e);
-        }
+      const pc = peersRef.current[data.caller];
+      if (pc && pc.remoteDescription) {
+        pc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(e => console.log("ICE Error", e));
       } else {
         if (!pendingCandidates.current[data.caller]) pendingCandidates.current[data.caller] = [];
         pendingCandidates.current[data.caller].push(data.candidate);
@@ -241,39 +212,38 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
         delete newUsers[userId];
         return newUsers;
       });
+      if (presenterId === userId) setPresenterId(null);
     });
 
     return () => {
-      socket.off("user-connected"); 
-      socket.off("offer"); 
-      socket.off("answer"); 
-      socket.off("ice-candidate"); 
-      socket.off("user-disconnected");
+      socket.off("user-connected"); socket.off("offer"); socket.off("answer"); socket.off("ice-candidate"); socket.off("user-disconnected");
     };
-  }, [socket, roomCode, myName, role, isScreenSharing]);
+  }, [socket, roomCode, myName, role, isScreenSharing, presenterId]);
 
 
-  // 3. HOST CONTROLS & NEW: REACTION LISTENER
+  // 3. HOST CONTROLS & ADVANCED LISTENER
   useEffect(() => {
     if (!socket) return;
 
     const handleCommand = (msg: CommandMessage) => {
       if (msg.type === "REACTION") {
         addReactionToScreen({ id: msg.id, emoji: msg.emoji, name: msg.senderName });
-        return;
       }
-      
-      if (msg.type === "MUTE_ALL" && role !== "HOST") {
+      else if (msg.type === "SCREEN_SHARE_START") {
+        setPresenterId(msg.senderId);
+      }
+      else if (msg.type === "SCREEN_SHARE_STOP") {
+        setPresenterId(null);
+      }
+      else if (msg.type === "MUTE_ALL" && role !== "HOST") {
         const audioTrack = localStreamRef.current?.getAudioTracks()[0];
         if (audioTrack && audioTrack.enabled) {
           audioTrack.enabled = false;
           setIsMicOn(false);
         }
       }
-      if (msg.type === "KICK" && msg.targetId === socket.id) {
-        if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(track => track.stop());
-        }
+      else if (msg.type === "KICK" && msg.targetId === socket.id) {
+        if (localStreamRef.current) localStreamRef.current.getTracks().forEach(track => track.stop());
         alert("You have been removed from the meeting by the Host.");
         window.location.href = "/";
       }
@@ -284,7 +254,7 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
   }, [socket, role, addReactionToScreen]);
 
 
-  // --- HARDWARE TOGGLES & SCREEN SHARE ---
+  // --- SCREEN SHARE ENGINE ---
 
   const toggleScreenShare = async () => {
     if (isScreenSharing) {
@@ -292,7 +262,7 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
         return;
     }
     try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
         const screenTrack = screenStream.getVideoTracks()[0];
         screenTrackRef.current = screenTrack;
 
@@ -304,12 +274,15 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
         const audioTrack = localStreamRef.current?.getAudioTracks()[0];
         const displayStream = new MediaStream([screenTrack]);
         if (audioTrack) displayStream.addTrack(audioTrack);
+        
         setLocalStream(displayStream);
         setIsScreenSharing(true);
+        if (socket && socket.id) {
+            setPresenterId(socket.id);
+            socket.emit("send-message", roomCode, { type: "SCREEN_SHARE_START", senderId: socket.id });
+        }
 
-        screenTrack.onended = () => {
-            stopScreenShare();
-        };
+        screenTrack.onended = () => stopScreenShare();
     } catch (err) {
         console.error("Screen share failed or cancelled", err);
     }
@@ -329,16 +302,15 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
         setLocalStream(new MediaStream(localStreamRef.current!.getTracks()));
     }
     setIsScreenSharing(false);
+    if (socket && socket.id) {
+        setPresenterId(null);
+        socket.emit("send-message", roomCode, { type: "SCREEN_SHARE_STOP", senderId: socket.id });
+    }
   };
   
-  const muteAllUsers = () => {
-    if (socket && role === "HOST") socket.emit("send-message", roomCode, { type: "MUTE_ALL" });
-  };
-
-  const kickUser = (userId: string) => {
-    if (socket && role === "HOST") socket.emit("send-message", roomCode, { type: "KICK", targetId: userId });
-  };
-
+  const muteAllUsers = () => { if (socket && role === "HOST") socket.emit("send-message", roomCode, { type: "MUTE_ALL" }); };
+  const kickUser = (userId: string) => { if (socket && role === "HOST") socket.emit("send-message", roomCode, { type: "KICK", targetId: userId }); };
+  
   const toggleMic = () => {
     if (localStreamRef.current) {
       const track = localStreamRef.current.getAudioTracks()[0];
@@ -361,53 +333,107 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
      window.location.href = '/meeting-ended';
   };
 
+  // LAYOUT HELPERS
+  const isPresenting = presenterId !== null;
+  const isMePresenting = presenterId === socket?.id;
+
   return (
     <div className="flex w-full h-full bg-black relative overflow-hidden font-sans">
       
-      {/* FLOATING REACTION BUBBLES OVERLAY */}
-      <div className="absolute bottom-32 left-1/2 -translate-x-1/2 pointer-events-none z-50">
+      {/* PRESENTATION BANNER */}
+      <AnimatePresence>
+        {isMePresenting && (
+          <motion.div 
+            initial={{ y: -100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -100, opacity: 0 }}
+            className="absolute top-6 left-1/2 -translate-x-1/2 bg-indigo-600/90 backdrop-blur-md text-white px-6 py-3 rounded-full flex items-center gap-4 z-40 shadow-2xl border border-indigo-400"
+          >
+             <span className="flex items-center gap-2 font-medium">
+               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> 
+               You are presenting to everyone
+             </span>
+             <div className="w-px h-6 bg-white/20 mx-2" />
+             <Button size="sm" onClick={stopScreenShare} className="bg-white text-indigo-600 hover:bg-zinc-200 rounded-full h-8 font-bold">
+               Stop Sharing
+             </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* TELEGRAM STYLE ANIMATED REACTION BUBBLES */}
+      <div className="absolute bottom-32 left-1/2 -translate-x-1/2 pointer-events-none z-[100]">
           <AnimatePresence>
               {reactions.map((r) => (
                   <motion.div
                       key={r.id}
-                      // FIX: Render is now perfectly pure. Coordinates are read from state, not generated here!
-                      initial={{ opacity: 0, y: 0, x: r.startX, scale: 0.5 }}
-                      animate={{ opacity: 1, y: -250, x: r.endX, scale: 1.5 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      transition={{ duration: 2.5, ease: "easeOut" }}
+                      initial={{ scale: 0, y: 0, x: r.startX, rotate: -20, opacity: 0 }}
+                      animate={{ 
+                        scale: [0, 2, 1.3, 1.5], 
+                        y: -300,                 
+                        x: r.endX,               
+                        rotate: [0, 15, -10, 10, 0], 
+                        opacity: [0, 1, 1, 0]    
+                      }}
+                      transition={{ 
+                        duration: 3, 
+                        scale: { type: "spring", stiffness: 300, damping: 10 },
+                        ease: "easeOut" 
+                      }}
                       className="absolute bottom-0 flex flex-col items-center"
                   >
-                      <div className="bg-black/60 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full mb-1 shadow-lg whitespace-nowrap">
+                      <div className="bg-black/60 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full mb-1 shadow-lg whitespace-nowrap border border-white/10">
                           {r.name}
                       </div>
-                      <div className="text-4xl drop-shadow-2xl">{r.emoji}</div>
+                      <div className="text-5xl drop-shadow-2xl">{r.emoji}</div>
                   </motion.div>
               ))}
           </AnimatePresence>
       </div>
 
-      <div className={`flex flex-col flex-1 transition-all duration-300 ${showParticipants ? 'mr-80' : 'mr-0'}`}>
+      <div className={`flex flex-col w-full transition-all duration-300 ${showParticipants ? 'mr-80' : 'mr-0'}`}>
+        
+        {/* HEADER BAR */}
         <div className="w-full p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/80 to-transparent">
           <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 text-white font-mono text-sm shadow-lg">
             {roomCode}
           </div>
           <Button variant="outline" onClick={() => setShowParticipants(!showParticipants)} className="bg-white/10 text-white border-white/20 hover:bg-white/20 rounded-xl backdrop-blur-md">
-            <Users className="w-4 h-4 mr-2" /> 
-            {Object.keys(remoteUsers).length + 1}
+            <Users className="w-4 h-4 mr-2" /> {Object.keys(remoteUsers).length + 1}
           </Button>
         </div>
 
-        <div className="flex-1 p-4 pt-16 pb-24 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-max max-w-7xl mx-auto">
-            <VideoPlayer stream={localStream} isLocal={!isScreenSharing} name={myName} userRole={role || "GUEST"} />
-            {Object.entries(remoteUsers).map(([id, remoteUser]) => (
-              <VideoPlayer key={id} stream={remoteUser.stream || null} isLocal={false} name={remoteUser.name || "Connecting..."} userRole={remoteUser.role || "GUEST"} />
-            ))}
-          </div>
+        {/* --- DYNAMIC LAYOUT ENGINE --- */}
+        <div className="flex-1 p-4 pt-10 pb-32 overflow-hidden flex flex-col">
+          {isPresenting ? (
+            <div className="flex flex-col h-full gap-4 w-full max-w-7xl mx-auto">
+              <div className="flex-1 w-full min-h-[50vh] bg-black rounded-[2rem] shadow-2xl relative overflow-hidden border border-white/5">
+                 {isMePresenting ? (
+                    <VideoPlayer stream={localStream} isLocal={true} name={`${myName}'s Screen`} userRole={role || "GUEST"} isSpotlight={true} />
+                 ) : (
+                    remoteUsers[presenterId] && <VideoPlayer stream={remoteUsers[presenterId].stream || null} isLocal={false} name={`${remoteUsers[presenterId].name}'s Screen`} userRole={remoteUsers[presenterId].role || "GUEST"} isSpotlight={true} />
+                 )}
+              </div>
+              <div className="h-40 shrink-0 w-full overflow-x-auto flex gap-4 pb-2 snap-x">
+                 {!isMePresenting && (
+                    <div className="h-full aspect-video shrink-0 snap-center"><VideoPlayer stream={localStream} isLocal={true} name={myName} userRole={role || "GUEST"} /></div>
+                 )}
+                 {Object.entries(remoteUsers).map(([id, remoteUser]) => {
+                    if (id === presenterId) return null; 
+                    return <div key={id} className="h-full aspect-video shrink-0 snap-center"><VideoPlayer stream={remoteUser.stream || null} isLocal={false} name={remoteUser.name || "..."} userRole={remoteUser.role || "GUEST"} /></div>
+                 })}
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-max w-full max-w-7xl mx-auto overflow-y-auto pr-2">
+              <VideoPlayer stream={localStream} isLocal={true} name={myName} userRole={role || "GUEST"} />
+              {Object.entries(remoteUsers).map(([id, remoteUser]) => (
+                <VideoPlayer key={id} stream={remoteUser.stream || null} isLocal={false} name={remoteUser.name || "Connecting..."} userRole={remoteUser.role || "GUEST"} />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* BOTTOM CONTROL DOCK */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 px-6 py-3 bg-zinc-900/80 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl z-20">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 px-6 py-3 bg-zinc-900/80 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl z-[90]">
           
           <Button size="icon" onClick={toggleMic} className={`w-14 h-14 rounded-2xl transition-all ${isMicOn ? 'bg-zinc-800 hover:bg-zinc-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)]'}`}>
             {isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
@@ -417,26 +443,24 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
             {isCamOn ? <VideoIcon className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
           </Button>
 
-          {/* SCREEN SHARE BUTTON */}
           <Button size="icon" onClick={toggleScreenShare} className={`w-14 h-14 rounded-2xl transition-all hidden sm:flex ${isScreenSharing ? 'bg-cyan-500 hover:bg-cyan-600 text-white shadow-[0_0_20px_rgba(6,182,212,0.4)]' : 'bg-zinc-800 hover:bg-zinc-700 text-white'}`}>
             {isScreenSharing ? <MonitorOff className="w-6 h-6" /> : <MonitorUp className="w-6 h-6" />}
           </Button>
 
-          {/* REACTION MENU POPOVER */}
-          <div className="relative">
+          <div className="relative z-[100]">
             <AnimatePresence>
                 {showReactionMenu && (
                     <motion.div
                         initial={{ opacity: 0, y: 20, scale: 0.9 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 bg-zinc-900/95 backdrop-blur-xl border border-white/10 p-2 rounded-2xl flex gap-1 shadow-2xl"
+                        className="absolute bottom-[120%] left-1/2 -translate-x-1/2 bg-zinc-900/95 backdrop-blur-xl border border-white/10 p-2 rounded-2xl flex gap-1 shadow-2xl origin-bottom"
                     >
                         {EMOJIS.map(emoji => (
                             <button
                                 key={emoji}
                                 onClick={() => sendReaction(emoji)}
-                                className="text-2xl hover:scale-125 transition-transform p-2"
+                                className="text-2xl hover:scale-125 transition-transform p-2 cursor-pointer"
                             >
                                 {emoji}
                             </button>
@@ -460,11 +484,9 @@ export function ActualVideoRoom({ roomCode, role, user }: ActualVideoRoomProps) 
       <AnimatePresence>
         {showParticipants && (
           <motion.div 
-            initial={{ x: "100%", opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: "100%", opacity: 0 }}
+            initial={{ x: "100%", opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="absolute right-0 top-0 bottom-0 w-80 bg-zinc-950/90 backdrop-blur-3xl border-l border-white/10 shadow-2xl flex flex-col z-30"
+            className="absolute right-0 top-0 bottom-0 w-80 bg-zinc-950/90 backdrop-blur-3xl border-l border-white/10 shadow-2xl flex flex-col z-[80]"
           >
             <div className="p-5 border-b border-white/10 flex justify-between items-center">
               <h2 className="text-lg font-bold text-white flex items-center gap-2"><Users className="w-5 h-5 text-indigo-400"/> Participants</h2>
