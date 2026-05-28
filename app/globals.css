@@ -64,3 +64,19 @@
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
 }
+/* Hide the default LiveKit control bar so our custom floating one takes over */
+.lk-control-bar {
+  display: none !important;
+}
+
+/* 1. UNIVERSAL CAMERA MIRRORING */
+/* Mirror ALL camera feeds (both yours and remote participants) */
+.lk-participant-tile[data-lk-source="camera"] video {
+  transform: scaleX(-1) !important;
+}
+
+/* 2. STRICTLY PROTECT SCREEN SHARES */
+/* Never mirror a screen share, regardless of who is sharing it */
+.lk-participant-tile[data-lk-source="screen_share"] video {
+  transform: scaleX(1) !important;
+}

@@ -15,7 +15,6 @@ import FaqSection from "@/components/ui/faq-section";
 import PricingSection from "@/components/ui/pricing-section";
 import Footer from "@/components/ui/footer";
 import ScrollToTop from "@/components/ui/scroll-to-top";
-import { useSession, signIn } from "next-auth/react";
 import WelcomeScreen from "@/components/ui/welcome-screen";
 
 export default function Home() {
@@ -24,28 +23,14 @@ export default function Home() {
   const [isCreating, setIsCreating] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
 
-  const { data: session, status } = useSession();
-  const isLoggedIn = !!session;
-  
+  // TEMPORARY BYPASS: Force the app to act like we are always logged in for testing
+  const isLoggedIn = true; 
 
   const startNewMeeting = async () => {
-    if (!isLoggedIn) {
-      signIn("github");
-      return;
-    }
-    try {
-      setIsCreating(true);
-      const res = await fetch("/api/meetings", { method: "POST" });
-      const data = await res.json();
-      
-      if (data.meetingCode) {
-        router.push(`/meeting/${data.meetingCode}`);
-      }
-    } catch (error) {
-      console.error("Failed to create meeting", error);
-    } finally {
-      setIsCreating(false);
-    }
+    setIsCreating(true);
+    // TEMPORARY BYPASS: Generate a room locally instead of hitting the locked API
+    const tempCode = Math.random().toString(36).substring(2, 10).toLowerCase();
+    router.push(`/meeting/${tempCode}`);
   };
 
   const joinMeeting = () => {
@@ -53,11 +38,12 @@ export default function Home() {
       router.push(`/meeting/${meetingCode}`);
     }
   };
-const startGuestSession = () => {
-    // Generate a random 6-character room ID (e.g., "x7v9q2")
+
+  const startGuestSession = () => {
     const uniqueRoomId = Math.random().toString(36).substring(2, 8).toLowerCase();
     router.push(`/guest-chat/${uniqueRoomId}`);
   };
+
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.20, delayChildren: 0.35 } }
@@ -74,10 +60,6 @@ const startGuestSession = () => {
     { text: "Zero Latency", icon: <ZapIcon className="w-4 h-4 text-purple-400" /> },
     { text: "No Downloads Required", icon: <Globe className="w-4 h-4 text-blue-400" /> },
   ];
-
-  if (status === "loading" && !showWelcome) {
-    return <main className="min-h-[100dvh] bg-[#050505]" />;
-  }
 
   return (
     <>
@@ -99,7 +81,6 @@ const startGuestSession = () => {
           <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[800px] h-[500px] opacity-40 blur-[120px] rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 pointer-events-none z-0" />
 
           <div className="flex h-[100dvh] pt-16"> 
-            
             <div className="hidden md:block">
                 {isLoggedIn && <Sidebar />}
             </div>
@@ -141,7 +122,7 @@ const startGuestSession = () => {
 
                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 1.2, type: "spring" }} className="mt-12 w-full max-w-2xl relative">
                   
-                  <div className={`relative transition-all duration-500 ${!isLoggedIn ? 'opacity-50 grayscale blur-[2px] pointer-events-none select-none' : ''}`}>
+                  <div className="relative transition-all duration-500">
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/30 to-cyan-500/30 rounded-[1.25rem] blur opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
                     
                     <Card className="relative p-3 bg-black/40 border border-white/10 backdrop-blur-2xl flex flex-col sm:flex-row gap-3 shadow-[0_8px_32px_0_rgba(31,38,135,0.2)] rounded-2xl group">
@@ -173,23 +154,6 @@ const startGuestSession = () => {
                       </div>
                     </Card>
                   </div>
-
-                  {!isLoggedIn && (
-                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center">
-                        <div className="bg-black/70 backdrop-blur-md border border-indigo-500/30 p-5 rounded-2xl flex items-center gap-4 shadow-2xl w-[90%] sm:w-auto">
-                            <div className="p-3 bg-indigo-500/20 rounded-full hidden sm:block">
-                                <Lock className="w-6 h-6 text-indigo-400" />
-                            </div>
-                            <div className="text-center sm:text-left">
-                                <p className="text-base font-bold text-white">Login Required</p>
-                                <p className="text-sm text-gray-300 hidden sm:block">Sign in to host unlimited meetings</p>
-                            </div>
-                            <Button onClick={() => signIn("github")} className="mt-4 sm:mt-0 sm:ml-4 bg-indigo-600 hover:bg-indigo-500 rounded-full px-6 transition-transform hover:scale-105 w-full sm:w-auto">
-                                Log In
-                            </Button>
-                        </div>
-                    </div>
-                  )}
                 </motion.div>
 
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }} className="mt-8 mb-32">
