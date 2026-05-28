@@ -4,6 +4,8 @@ import os
 import sys
 import uuid  # <-- NEW: Import Python's built-in unique ID generator
 from dotenv import load_dotenv
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # 1. FORCE LOAD ENV VARS BEFORE ANYTHING ELSE
 load_dotenv()
@@ -85,7 +87,24 @@ async def transcribe_track(room: rtc.Room, track: rtc.Track, participant: rtc.Re
 
     await asyncio.gather(push_audio(), receive_text())
 
+# --- THE FAKE WEB SERVER HACK ---
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"AI Agent is awake and listening!")
+
+def run_dummy_server():
+    # Render assigns a dynamic port, default to 8080 locally
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), DummyHandler)
+    server.serve_forever()
+
 if __name__ == "__main__":
+    # Start the fake web server in a background thread to satisfy Render's free tier
+    threading.Thread(target=run_dummy_server, daemon=True).start()
+    
+    # Start the actual LiveKit worker
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
