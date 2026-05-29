@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Geist} from "next/font/google";
+import { Geist } from "next/font/google";
 import "./globals.css";
-import { SocketProvider } from "@/components/providers/SocketProvider";
-import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { cn } from "@/lib/utils";
+
+// --- CHANGED: We now only need to import the ONE unified Providers file ---
 import { Providers } from "@/components/Providers";
 
 const inter = Geist({
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1, // STOPS AGGRESSIVE AUTO-ZOOM
+  maximumScale: 1, 
   userScalable: false,
 };
 
@@ -32,13 +32,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-            <SocketProvider>
-               <Providers> 
-                  {children}
-               </Providers>    
-            </SocketProvider>
-        </ThemeProvider>
+        {/* The unified provider wraps everything securely on the client side */}
+        <Providers> 
+           {children}
+        </Providers>    
       </body>
     </html>
   );

@@ -21,7 +21,7 @@ export function CreateMeetingButton() {
       if (data.meetingCode) {
         // Redirect the user straight into their new room!
         // (Adjust this route if your room page is located elsewhere, e.g., /room/[id])
-        router.push(`/room/${data.meetingCode}`);
+        router.push("/meeting/${data.meetingCode}")
       } else {
         console.error("Failed to generate meeting code:", data.error);
         setIsLoading(false);

@@ -2,13 +2,19 @@
 
 import { useState, useEffect, use } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, ShieldCheck } from "lucide-react";
+import { Copy, ShieldCheck, Loader2 } from "lucide-react";
 import { LiveKitVideoRoom } from "@/components/LiveKitVideoRoom";
+
+// 1. Import NextAuth's useSession hook to get the real user
+import { useSession } from "next-auth/react";
 
 export default function MeetingLobby({ params }: { params: Promise<{ meetingCode: string }> }) {
   const unwrappedParams = use(params);
   const meetingCode = unwrappedParams.meetingCode;
   
+  // 2. Fetch the current user's session securely
+  const { data: session, status } = useSession();
+
   const [hasJoined, setHasJoined] = useState(false);
   const [copied, setCopied] = useState(false);
   const [meetingLink, setMeetingLink] = useState("");
@@ -24,10 +30,22 @@ export default function MeetingLobby({ params }: { params: Promise<{ meetingCode
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // 3. Show a brief loading state while NextAuth checks the user's cookies
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
+  // 4. Extract the real name, or default to "Guest" if they aren't logged in
+  const userName = session?.user?.name || "Guest";
+
   // --- PHASE 2: THE ACTUAL MEETING ROOM ---
-  // If they click join, immediately render the LiveKit Room! No more toggles.
   if (hasJoined) {
-    return <LiveKitVideoRoom roomCode={meetingCode} user={{ name: "Meeting Host" }} />;
+    // 5. Pass the dynamic userName into the LiveKit room
+    return <LiveKitVideoRoom roomCode={meetingCode} user={{ name: userName }} />;
   }
 
   // --- PHASE 1: THE LOBBY UI ---

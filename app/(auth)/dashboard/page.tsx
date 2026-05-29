@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Calendar, Clock, Plus, Users, MoreHorizontal, Lock } from "lucide-react";
 import { getServerSession } from "next-auth";
-import { PrismaClient } from "@prisma/client";
 import Image from "next/image";
 import Link from "next/link";
 import { CreateMeetingButton } from "@/components/CreateMeetingButton";
@@ -28,7 +27,7 @@ export default async function Dashboard() {
 
   // Set up default/fallback variables
   let totalMeetings = 0;
- let upcomingMeetingsData: DashboardMeeting[] = [];
+  let upcomingMeetingsData: DashboardMeeting[] = [];
   let recentHistoryData: DashboardMeeting[] = [];
   let totalMinutes = 0;
   
@@ -72,7 +71,7 @@ export default async function Dashboard() {
   }
 
   // 3. Provide dummy data for guests so the blurred background looks populated
- const displayUpcoming: DashboardMeeting[] = isLoggedIn ? upcomingMeetingsData : [
+  const displayUpcoming: DashboardMeeting[] = isLoggedIn ? upcomingMeetingsData : [
     { 
       id: 'dummy-1', 
       title: 'Team Standup', 
@@ -99,6 +98,7 @@ export default async function Dashboard() {
       createdAt: new Date("2024-11-25T09:15:00Z") 
     },
   ];
+
   const formatDate = (date?: Date | null) => {
     if (!date) return "TBD";
     return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);

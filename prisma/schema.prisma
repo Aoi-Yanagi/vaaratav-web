@@ -3,11 +3,14 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "postgresql" // Assuming you are using PostgreSQL as discussed
   url      = env("DATABASE_URL")
 }
 
-// --- NEXTAUTH REQUIRED MODELS ---
+// --------------------------------------
+// NEXTAUTH REQUIRED MODELS
+// --------------------------------------
+
 model Account {
   id                 String  @id @default(cuid())
   userId             String
@@ -43,7 +46,10 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// --- YOUR MERGED APP MODELS ---
+// --------------------------------------
+// YOUR APP'S CUSTOM MODELS
+// --------------------------------------
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -51,29 +57,24 @@ model User {
   emailVerified DateTime?
   image         String?
   
-  // NextAuth Relations
+  // Relations
   accounts      Account[]
   sessions      Session[]
-  
-  // Your VaartaV Relations
   meetings      Meeting[] 
-
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
 }
 
 model Meeting {
-  id          String   @id @default(cuid())
-  title       String   @default("My VaartaV Meeting")
-  meetingCode String   @unique 
+  id          String    @id @default(cuid())
+  title       String
+  meetingCode String    @unique
+  status      String    @default("WAITING") // Can be "WAITING" or "COMPLETED"
   
+  // Timestamps for your dashboard analytics
+  startTime   DateTime? 
+  endTime     DateTime? 
+  createdAt   DateTime  @default(now())
+
+  // Relation mapping the meeting to the host User
   hostId      String
-  host        User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
-
-  startTime   DateTime @default(now())
-  endTime     DateTime?
-  status      String   @default("WAITING") 
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  host        User      @relation(fields: [hostId], references: [id], onDelete: Cascade)
 }
