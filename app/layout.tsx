@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { Analytics } from "@vercel/analytics/next"
 
 // --- CHANGED: We now only need to import the ONE unified Providers file ---
 import { Providers } from "@/components/Providers";
@@ -36,6 +37,7 @@ export default function RootLayout({
         <Providers> 
            {children}
         </Providers>    
+        <Analytics/>
       </body>
     </html>
   );
