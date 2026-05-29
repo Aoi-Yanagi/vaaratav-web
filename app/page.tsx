@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import Hero3D from "@/components/3d/HeroGeometric";
 import { motion, Variants, AnimatePresence } from "framer-motion";
-import { Keyboard, Video, Zap, Lock, Shield, VideoIcon, ZapIcon, Globe } from "lucide-react";
+import { Keyboard, Video, Zap, Shield, VideoIcon, ZapIcon, Globe } from "lucide-react";
 import { useState } from "react"; 
 import { useRouter } from "next/navigation";
 import FeaturesGrid from "@/components/ui/features-grid";
