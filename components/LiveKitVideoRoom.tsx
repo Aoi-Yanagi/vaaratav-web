@@ -49,7 +49,26 @@ export function LiveKitVideoRoom({ roomCode, user }: LiveKitVideoRoomProps) {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryResult, setSummaryResult] = useState<string | null>(null);
   const [blurEnabled, setBlurEnabled] = useState(false);
-  // NEW: The Function that calls our API
+
+  // NEW: The Function that calls our End Meeting API
+  const handleDisconnect = async () => {
+    try {
+      // Send a request to our new endpoint to update the database
+      await fetch('/api/meetings/end', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingCode: roomCode }),
+      });
+      
+      // Once the database is updated, send the user to the dashboard
+      window.location.href = '/dashboard';
+    } catch (error) {
+      console.error("Failed to update meeting status", error);
+      // Fallback: Still redirect if the network fails
+      window.location.href = '/dashboard'; 
+    }
+  };
+
   const handleGenerateSummary = async () => {
     if (transcriptVault.current.length === 0) {
         alert("No words have been spoken yet!");
@@ -81,7 +100,6 @@ export function LiveKitVideoRoom({ roomCode, user }: LiveKitVideoRoomProps) {
 
   // Hydration Guard: Blocks initialization until the client DOM layout is stable
   useEffect(() => {
-    // FIX: Wrapped in a timeout callback to satisfy strict synchronous render rules
     const timer = setTimeout(() => setIsMounted(true), 0);
     return () => clearTimeout(timer);
   }, []);
@@ -138,7 +156,8 @@ export function LiveKitVideoRoom({ roomCode, user }: LiveKitVideoRoomProps) {
       token={token}
       serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
       options={{ adaptiveStream: true, dynacast: true }}
-      onDisconnected={() => (window.location.href = "/")}
+      // --- CHANGED: Now uses our new function to update the database before leaving ---
+      onDisconnected={handleDisconnect}
       data-lk-theme="default"
       className="w-full h-[100dvh] overflow-hidden bg-zinc-950"
     >
@@ -258,7 +277,6 @@ export function CaptionsOverlay({ enabled }: { enabled: boolean }) {
   // Reset text prompt whenever captions are toggled back on
  useEffect(() => {
     if (enabled) {
-      // FIX: Wrapped in a timeout callback to prevent synchronous effect cascade
       const timer = setTimeout(() => setCaptionText("Waiting for speech..."), 0);
       return () => clearTimeout(timer);
     }
