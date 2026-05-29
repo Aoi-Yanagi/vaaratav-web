@@ -26,11 +26,31 @@ export default function Home() {
   // TEMPORARY BYPASS: Force the app to act like we are always logged in for testing
   const isLoggedIn = true; 
 
-  const startNewMeeting = async () => {
+ const startNewMeeting = async () => {
     setIsCreating(true);
-    // TEMPORARY BYPASS: Generate a room locally instead of hitting the locked API
-    const tempCode = Math.random().toString(36).substring(2, 10).toLowerCase();
-    router.push(`/meeting/${tempCode}`);
+    
+    try {
+      // Hit the secure API route we created to generate a code and log it in Postgres
+      const response = await fetch("/api/meetings/create", {
+        method: "POST",
+      });
+      
+      const data = await response.json();
+      
+      if (data.meetingCode) {
+        // Success! Redirect to the newly generated meeting room
+        router.push(`/meeting/${data.meetingCode}`);
+      } else {
+        // If it fails (e.g., user is not logged in), stop the loading state
+        console.error("Failed to generate meeting code:", data.error);
+        setIsCreating(false);
+        // Optional: Send them to the login page if they aren't authenticated
+        // router.push("/login");
+      }
+    } catch (error) {
+      console.error("Network error:", error);
+      setIsCreating(false);
+    }
   };
 
   const joinMeeting = () => {

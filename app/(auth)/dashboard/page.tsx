@@ -7,6 +7,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import { PrismaClient } from "@prisma/client";
 import Image from "next/image";
+import { CreateMeetingButton } from "@/components/CreateMeetingButton";
 
 // Ideally, import prisma from a centralized lib/prisma.ts file to prevent connection pooling issues in dev
 const prisma = new PrismaClient(); 
@@ -102,8 +103,8 @@ export default async function Dashboard() {
           </Card>
 
           <div className="grid grid-cols-1 gap-4">
-            <Button className="h-14 bg-indigo-600 hover:bg-indigo-700 justify-start text-lg px-6">
-              <Plus className="mr-3 w-6 h-6" /> New Meeting
+            <CreateMeetingButton />
+            <Button variant="outline" className="h-14 border-neutral-800 bg-neutral-900 justify-start text-lg px-6 hover:bg-neutral-800">
             </Button>
             <Button variant="outline" className="h-14 border-neutral-800 bg-neutral-900 justify-start text-lg px-6 hover:bg-neutral-800">
               <Calendar className="mr-3 w-6 h-6 text-indigo-400" /> Schedule
