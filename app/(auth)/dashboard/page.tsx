@@ -1,7 +1,7 @@
 import GlobalNavigation from "@/components/ui/global-navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Calendar, Clock, Plus, Users, MoreHorizontal } from "lucide-react";
+import { Calendar, Clock, Users, MoreHorizontal } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
