@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import Hero3D from "@/components/3d/HeroGeometric";
 import { motion, Variants, AnimatePresence } from "framer-motion";
-import { Keyboard, Video, Zap, Shield, VideoIcon, ZapIcon, Globe } from "lucide-react";
+import { Keyboard, Video, Zap, Lock, Shield, VideoIcon, ZapIcon, Globe } from "lucide-react";
 import { useState } from "react"; 
 import { useRouter } from "next/navigation";
 import FeaturesGrid from "@/components/ui/features-grid";
@@ -16,21 +16,29 @@ import PricingSection from "@/components/ui/pricing-section";
 import Footer from "@/components/ui/footer";
 import ScrollToTop from "@/components/ui/scroll-to-top";
 import WelcomeScreen from "@/components/ui/welcome-screen";
+import { useSession } from "next-auth/react";
 
 export default function Home() {
   const router = useRouter();
+  
+  // 1. Hook into NextAuth to check the real login status
+  const { status } = useSession();
+  const isLoggedIn = status === "authenticated";
+
   const [meetingCode, setMeetingCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
 
-  // TEMPORARY BYPASS: Force the app to act like we are always logged in for testing
-  const isLoggedIn = true; 
+  const startNewMeeting = async () => {
+    // 2. If they are not logged in, send them to the login page immediately
+    if (!isLoggedIn) {
+      router.push("/login");
+      return;
+    }
 
- const startNewMeeting = async () => {
     setIsCreating(true);
     
     try {
-      // Hit the secure API route we created to generate a code and log it in Postgres
       const response = await fetch("/api/meetings/create", {
         method: "POST",
       });
@@ -38,14 +46,10 @@ export default function Home() {
       const data = await response.json();
       
       if (data.meetingCode) {
-        // Success! Redirect to the newly generated meeting room
         router.push(`/meeting/${data.meetingCode}`);
       } else {
-        // If it fails (e.g., user is not logged in), stop the loading state
         console.error("Failed to generate meeting code:", data.error);
         setIsCreating(false);
-        // Optional: Send them to the login page if they aren't authenticated
-        // router.push("/login");
       }
     } catch (error) {
       console.error("Network error:", error);
@@ -147,12 +151,28 @@ export default function Home() {
                     
                     <Card className="relative p-3 bg-black/40 border border-white/10 backdrop-blur-2xl flex flex-col sm:flex-row gap-3 shadow-[0_8px_32px_0_rgba(31,38,135,0.2)] rounded-2xl group">
                       
-                      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto">
-                        <Button size="lg" className="w-full bg-indigo-600 hover:bg-indigo-500 h-14 text-base font-semibold shadow-[0_0_15px_rgba(79,70,229,0.5)] transition-all rounded-xl border border-indigo-400/20" onClick={startNewMeeting} disabled={isCreating}>
-                          <Video className="w-5 h-5 mr-2" />
-                          {isCreating ? 'Creating...' : 'New Meeting'}
-                        </Button>
-                      </motion.div>
+                      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto relative group/btn">
+  <Button 
+    size="lg" 
+    // 3. Dynamically apply classes: clear indigo if logged in, blurred zinc if logged out
+    className={`w-full h-14 text-base font-semibold transition-all duration-300 rounded-xl border ${
+      isLoggedIn 
+        ? "bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.5)] border-indigo-400/20 text-white" 
+        : "bg-zinc-800/80 text-zinc-400 border-white/5 blur-[1.5px] group-hover/btn:blur-none opacity-80"
+    }`} 
+    onClick={startNewMeeting} 
+    disabled={isCreating}
+  >
+    {/* 4. Swap the icon to a Lock if they aren't logged in */}
+    {isLoggedIn ? (
+      <Video className="w-5 h-5 mr-2" />
+    ) : (
+      <Lock className="w-5 h-5 mr-2" />
+    )}
+    
+    {isCreating ? 'Creating...' : isLoggedIn ? 'New Meeting' : 'Log in to Host'}
+  </Button>
+</motion.div>
 
                       <div className="flex-1 flex gap-2">
                         <div className="relative flex-1 group/input">

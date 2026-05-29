@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+// --- CHANGED: We now import our centralized auth and database instance ---
+import { authOptions, prisma } from "@/lib/auth";
 
 export async function POST() {
   try {
-    // 1. Verify the user is authenticated
+    // 1. Verify the user is authenticated securely
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,7 +30,7 @@ export async function POST() {
         title: `${session.user.name?.split(" ")[0] || "User"}'s Meeting`,
         meetingCode: meetingCode,
         hostId: user.id,
-        status: "WAITING", // Default status from your schema
+        status: "WAITING", 
         startTime: new Date(),
       },
     });
