@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import Hero3D from "@/components/3d/HeroGeometric";
 import { motion, Variants, AnimatePresence } from "framer-motion";
 import { Keyboard, Video, Zap, Lock, Shield, VideoIcon, ZapIcon, Globe } from "lucide-react";
-import { useState } from "react"; 
+import { useState, useEffect } from "react"; 
 import { useRouter } from "next/navigation";
 import FeaturesGrid from "@/components/ui/features-grid";
 import FaqSection from "@/components/ui/faq-section";
@@ -21,16 +21,33 @@ import { useSession } from "next-auth/react";
 export default function Home() {
   const router = useRouter();
   
-  // 1. Hook into NextAuth to check the real login status
   const { status } = useSession();
   const isLoggedIn = status === "authenticated";
 
   const [meetingCode, setMeetingCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(true);
+  
+  // 1. We removed `isMounted` entirely!
+ const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    // Wrapping the logic in setTimeout(..., 0) pushes the state update into the next 
+    // browser tick. This satisfies React's strict linter rules, prevents cascading renders, 
+    // AND keeps the back button functioning flawlessly.
+    const timer = setTimeout(() => {
+      const hasSeenIntro = sessionStorage.getItem("hasSeenVaartaVIntro");
+
+      if (!hasSeenIntro) {
+        setShowWelcome(true);
+        sessionStorage.setItem("hasSeenVaartaVIntro", "true");
+      }
+    }, 0);
+
+    // Cleanup the timer
+    return () => clearTimeout(timer);
+  }, []);
 
   const startNewMeeting = async () => {
-    // 2. If they are not logged in, send them to the login page immediately
     if (!isLoggedIn) {
       router.push("/login");
       return;
@@ -39,10 +56,7 @@ export default function Home() {
     setIsCreating(true);
     
     try {
-      const response = await fetch("/api/meetings/create", {
-        method: "POST",
-      });
-      
+      const response = await fetch("/api/meetings/create", { method: "POST" });
       const data = await response.json();
       
       if (data.meetingCode) {
@@ -85,18 +99,19 @@ export default function Home() {
     { text: "No Downloads Required", icon: <Globe className="w-4 h-4 text-blue-400" /> },
   ];
 
-  return (
-    <>
-      <AnimatePresence mode="wait">
-        {showWelcome && (
-          <WelcomeScreen key="welcome" onComplete={() => setShowWelcome(false)} />
-        )}
-      </AnimatePresence>
+  // 3. Removed the `if (!isMounted) return null;` which was breaking the back button.
 
-      {!showWelcome && (
+  return (
+    // 4. Wrapped EVERYTHING in AnimatePresence so Framer Motion tracks the back button perfectly
+    <AnimatePresence mode="wait">
+      {showWelcome ? (
+        <WelcomeScreen key="welcome" onComplete={() => setShowWelcome(false)} />
+      ) : (
         <motion.main 
+          key="main-dashboard" // The key helps Framer Motion reset animations on back navigation
           initial={{ opacity: 0, scale: 1.05, filter: "blur(15px)" }}
           animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+          exit={{ opacity: 0, filter: "blur(10px)" }} // Smooth exit if they trigger the welcome screen
           transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
           className="relative min-h-[100dvh] bg-[#050505] text-white selection:bg-indigo-500/30 overflow-hidden"
         >
@@ -152,27 +167,25 @@ export default function Home() {
                     <Card className="relative p-3 bg-black/40 border border-white/10 backdrop-blur-2xl flex flex-col sm:flex-row gap-3 shadow-[0_8px_32px_0_rgba(31,38,135,0.2)] rounded-2xl group">
                       
                       <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto relative group/btn">
-  <Button 
-    size="lg" 
-    // 3. Dynamically apply classes: clear indigo if logged in, blurred zinc if logged out
-    className={`w-full h-14 text-base font-semibold transition-all duration-300 rounded-xl border ${
-      isLoggedIn 
-        ? "bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.5)] border-indigo-400/20 text-white" 
-        : "bg-zinc-800/80 text-zinc-400 border-white/5 blur-[1.5px] group-hover/btn:blur-none opacity-80"
-    }`} 
-    onClick={startNewMeeting} 
-    disabled={isCreating}
-  >
-    {/* 4. Swap the icon to a Lock if they aren't logged in */}
-    {isLoggedIn ? (
-      <Video className="w-5 h-5 mr-2" />
-    ) : (
-      <Lock className="w-5 h-5 mr-2" />
-    )}
-    
-    {isCreating ? 'Creating...' : isLoggedIn ? 'New Meeting' : 'Log in to Host'}
-  </Button>
-</motion.div>
+                        <Button 
+                          size="lg" 
+                          className={`w-full h-14 text-base font-semibold transition-all duration-300 rounded-xl border ${
+                            isLoggedIn 
+                              ? "bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.5)] border-indigo-400/20 text-white" 
+                              : "bg-zinc-800/80 text-zinc-400 border-white/5 blur-[1.5px] group-hover/btn:blur-none opacity-80"
+                          }`} 
+                          onClick={startNewMeeting} 
+                          disabled={isCreating}
+                        >
+                          {isLoggedIn ? (
+                            <Video className="w-5 h-5 mr-2" />
+                          ) : (
+                            <Lock className="w-5 h-5 mr-2" />
+                          )}
+                          
+                          {isCreating ? 'Creating...' : isLoggedIn ? 'New Meeting' : 'Log in to Host'}
+                        </Button>
+                      </motion.div>
 
                       <div className="flex-1 flex gap-2">
                         <div className="relative flex-1 group/input">
@@ -216,6 +229,6 @@ export default function Home() {
           </div>
         </motion.main>
       )}
-    </>
+    </AnimatePresence>
   );
 }
