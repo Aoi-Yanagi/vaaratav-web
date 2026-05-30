@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // Assuming you are using PostgreSQL as discussed
-  url      = env("DATABASE_URL")
+  provider = "postgresql" 
+  // Note: The 'url' property has been safely removed for Prisma 7 compatibility. 
+  // Prisma will now read the connection URL directly from your prisma.config.ts file!
 }
 
 // --------------------------------------
@@ -17,12 +18,12 @@ model Account {
   type               String
   provider           String
   providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
+  refresh_token      String? @db.Text
+  access_token       String? @db.Text
   expires_at         Int?
   token_type         String?
   scope              String?
-  id_token           String?  @db.Text
+  id_token           String? @db.Text
   session_state      String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
