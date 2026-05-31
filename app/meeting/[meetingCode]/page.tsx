@@ -8,6 +8,8 @@ import { LiveKitVideoRoom } from "@/components/LiveKitVideoRoom";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 
+export const dynamic = "force-dynamic";
+
 export default function MeetingLobby({ params }: { params: Promise<{ meetingCode: string }> }) {
   const router = useRouter();
   const unwrappedParams = use(params);
