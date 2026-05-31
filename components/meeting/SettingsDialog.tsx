@@ -20,11 +20,11 @@ export function SettingsDialog() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full hover:bg-neutral-800">
+        <Button variant="ghost" size="icon" className="rounded-full hover:bg-zinc-200 dark:hover:bg-neutral-800 text-zinc-600 dark:text-zinc-300 transition-colors">
           <Settings className="w-5 h-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-neutral-900 border-neutral-800 text-white">
+      <DialogContent className="sm:max-w-[425px] bg-white dark:bg-neutral-900 border-zinc-200 dark:border-neutral-800 text-zinc-900 dark:text-white transition-colors">
         <DialogHeader>
           <DialogTitle>Audio & Video Settings</DialogTitle>
         </DialogHeader>
@@ -34,9 +34,9 @@ export function SettingsDialog() {
           {/* Camera Selection */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
-              <Video className="w-4 h-4 text-indigo-400" /> Camera
+              <Video className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> Camera
             </Label>
-            <select className="w-full bg-black border border-neutral-700 rounded-md p-2 text-sm focus:outline-none focus:border-indigo-500">
+            <select className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-neutral-700 rounded-md p-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
               {CAMERAS.map((cam) => <option key={cam}>{cam}</option>)}
             </select>
           </div>
@@ -44,13 +44,13 @@ export function SettingsDialog() {
           {/* Mic Selection */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
-              <Mic className="w-4 h-4 text-indigo-400" /> Microphone
+              <Mic className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> Microphone
             </Label>
-            <select className="w-full bg-black border border-neutral-700 rounded-md p-2 text-sm focus:outline-none focus:border-indigo-500">
+            <select className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-neutral-700 rounded-md p-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
               {MICS.map((mic) => <option key={mic}>{mic}</option>)}
             </select>
-            {/* Mic Test Visualizer (FAKE! 🤫) */}
-            <div className="h-1 w-full bg-neutral-800 rounded-full overflow-hidden">
+            {/* Mic Test Visualizer */}
+            <div className="h-1 w-full bg-zinc-200 dark:bg-neutral-800 rounded-full overflow-hidden transition-colors">
                 <div className="h-full bg-green-500 w-[60%] animate-pulse" />
             </div>
           </div>
@@ -58,12 +58,12 @@ export function SettingsDialog() {
           {/* Speaker Selection */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
-              <Volume2 className="w-4 h-4 text-indigo-400" /> Speakers
+              <Volume2 className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> Speakers
             </Label>
-            <select className="w-full bg-black border border-neutral-700 rounded-md p-2 text-sm focus:outline-none focus:border-indigo-500">
+            <select className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-neutral-700 rounded-md p-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
               {SPEAKERS.map((spk) => <option key={spk}>{spk}</option>)}
             </select>
-            <Button variant="outline" size="sm" className="w-full border-neutral-700 text-xs">
+            <Button variant="outline" size="sm" className="w-full border-zinc-200 dark:border-neutral-700 text-xs transition-colors hover:bg-zinc-100 dark:hover:bg-neutral-800">
               Test Audio
             </Button>
           </div>

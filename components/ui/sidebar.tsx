@@ -17,7 +17,6 @@ export default function Sidebar(){
     { imgURL: PlusSquare, route: '/recordings', label: 'Recordings' },
   ];
 
-  // --- ANIMATIONS ---
   const overlayVariants: Variants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { duration: 0.3 } },
@@ -31,11 +30,10 @@ export default function Sidebar(){
     },
     exit: {
       opacity: 0,
-      transition: { staggerChildren: 0.05, staggerDirection: -1 }, // Reverses the animation on close!
+      transition: { staggerChildren: 0.05, staggerDirection: -1 }, 
     },
   };
 
-  // Makes them scale down and move up towards the button when closed
   const itemVariants: Variants = {
     hidden: { opacity: 0, y: -20, scale: 0.6 },
     visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } },
@@ -44,7 +42,6 @@ export default function Sidebar(){
 
   return (
     <>
-      {/* 1. THE FLOATING HAMBURGER BUTTON */}
       <div className="fixed top-24 left-6 z-[60]">
         <button
           onClick={() => setIsOpen(!isOpen)}
@@ -60,21 +57,18 @@ export default function Sidebar(){
         </button>
       </div>
 
-      {/* 2. THE OVERLAY & ICONS */}
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* The Full Screen Fade Overlay */}
             <motion.div
               variants={overlayVariants}
               initial="hidden"
               animate="visible"
               exit="hidden"
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-              onClick={() => setIsOpen(false)} // Clicking anywhere outside closes it
+              className="fixed inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-sm z-50 transition-colors"
+              onClick={() => setIsOpen(false)} 
             />
 
-            {/* The Popping Icons */}
             <motion.div
               variants={menuVariants}
               initial="hidden"
@@ -90,14 +84,14 @@ export default function Sidebar(){
                   <motion.div key={link.label} variants={itemVariants}>
                     <Link
                       href={link.route}
-                      onClick={() => setIsOpen(false)} // Close menu when a link is clicked
+                      onClick={() => setIsOpen(false)} 
                       className={`flex items-center gap-4 p-2 pr-6 rounded-full w-fit group border transition-all shadow-xl ${
                         isActive 
                           ? 'bg-indigo-600 border-indigo-500 text-white shadow-indigo-500/20' 
-                          : 'bg-neutral-900 border-neutral-700 text-gray-300 hover:bg-neutral-800 hover:text-white'
+                          : 'bg-white dark:bg-neutral-900 border-zinc-200 dark:border-neutral-700 text-zinc-600 dark:text-gray-300 hover:bg-zinc-50 dark:hover:bg-neutral-800 hover:text-zinc-900 dark:hover:text-white'
                       }`}
                     >
-                      <div className={`p-2 rounded-full ${isActive ? 'bg-white/20' : 'bg-white/5 group-hover:bg-white/10 transition-colors'}`}>
+                      <div className={`p-2 rounded-full ${isActive ? 'bg-white/20' : 'bg-zinc-100 dark:bg-white/5 group-hover:bg-zinc-200 dark:group-hover:bg-white/10 transition-colors'}`}>
                         <Icon size={20} />
                       </div>
                       <span className="font-medium">{link.label}</span>
@@ -112,4 +106,3 @@ export default function Sidebar(){
     </>
   );
 };
-

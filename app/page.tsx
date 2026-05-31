@@ -20,33 +20,28 @@ import { useSession } from "next-auth/react";
 
 export default function Home() {
   const router = useRouter();
-  
   const { status } = useSession();
   const isLoggedIn = status === "authenticated";
 
   const [meetingCode, setMeetingCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   
-  // 1. We removed `isMounted` entirely!
- const [showWelcome, setShowWelcome] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    // Wrapping the logic in setTimeout(..., 0) pushes the state update into the next 
-    // browser tick. This satisfies React's strict linter rules, prevents cascading renders, 
-    // AND keeps the back button functioning flawlessly.
     const timer = setTimeout(() => {
       const hasSeenIntro = sessionStorage.getItem("hasSeenVaartaVIntro");
-
       if (!hasSeenIntro) {
         setShowWelcome(true);
         sessionStorage.setItem("hasSeenVaartaVIntro", "true");
       }
+      setIsInitialized(true);
     }, 0);
-
-    // Cleanup the timer
     return () => clearTimeout(timer);
   }, []);
 
+  // FIX 3: Fully restored your internal logic so 'router' and 'setIsCreating' are used
   const startNewMeeting = async () => {
     if (!isLoggedIn) {
       router.push("/login");
@@ -93,142 +88,136 @@ export default function Home() {
   };
 
   const taglines = [
-    { text: "Crystal Clear Video", icon: <VideoIcon className="w-4 h-4 text-cyan-400" /> },
-    { text: "Bank-Grade Security", icon: <Shield className="w-4 h-4 text-indigo-400" /> },
-    { text: "Zero Latency", icon: <ZapIcon className="w-4 h-4 text-purple-400" /> },
-    { text: "No Downloads Required", icon: <Globe className="w-4 h-4 text-blue-400" /> },
+    { text: "Crystal Clear Video", icon: <VideoIcon className="w-4 h-4 text-cyan-500 dark:text-cyan-400" /> },
+    { text: "Bank-Grade Security", icon: <Shield className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> },
+    { text: "Zero Latency", icon: <ZapIcon className="w-4 h-4 text-purple-500 dark:text-purple-400" /> },
+    { text: "No Downloads Required", icon: <Globe className="w-4 h-4 text-blue-500 dark:text-blue-400" /> },
   ];
 
-  // 3. Removed the `if (!isMounted) return null;` which was breaking the back button.
-
   return (
-    // 4. Wrapped EVERYTHING in AnimatePresence so Framer Motion tracks the back button perfectly
-    <AnimatePresence mode="wait">
-      {showWelcome ? (
-        <WelcomeScreen key="welcome" onComplete={() => setShowWelcome(false)} />
-      ) : (
-        <motion.main 
-          key="main-dashboard" // The key helps Framer Motion reset animations on back navigation
-          initial={{ opacity: 0, scale: 1.05, filter: "blur(15px)" }}
-          animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-          exit={{ opacity: 0, filter: "blur(10px)" }} // Smooth exit if they trigger the welcome screen
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-          className="relative min-h-[100dvh] bg-[#050505] text-white selection:bg-indigo-500/30 overflow-hidden"
-        >
-          <GlobalNavigation />
+    <>
+      <AnimatePresence>
+        {showWelcome && <WelcomeScreen key="welcome" onComplete={() => setShowWelcome(false)} />}
+      </AnimatePresence>
 
-          <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[800px] h-[500px] opacity-40 blur-[120px] rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 pointer-events-none z-0" />
+      <motion.main 
+        style={{ visibility: isInitialized ? "visible" : "hidden" }} 
+        initial={{ opacity: 0, scale: 1.05, filter: "blur(15px)" }}
+        animate={{ 
+          opacity: showWelcome ? 0 : 1, 
+          scale: showWelcome ? 1.05 : 1, 
+          filter: showWelcome ? "blur(15px)" : "blur(0px)" 
+        }}
+        transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+        className="relative min-h-[100dvh] bg-zinc-50 dark:bg-[#050505] text-zinc-900 dark:text-white selection:bg-indigo-500/30 overflow-hidden transition-colors duration-500"
+      >
+        <GlobalNavigation />
 
-          <div className="flex h-[100dvh] pt-16"> 
-            <div className="hidden md:block">
-                {isLoggedIn && <Sidebar />}
+        <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[800px] h-[500px] opacity-20 dark:opacity-40 blur-[120px] rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 pointer-events-none z-0" />
+
+        <div className="flex h-[100dvh] pt-16"> 
+          <div className="hidden md:block">
+              {isLoggedIn && <Sidebar />}
+          </div>
+
+          <div id="main-scroll-container" className="flex-1 relative overflow-y-auto w-full flex flex-col items-center">
+            <div className="absolute inset-0 z-0">
+                <Hero3D />
             </div>
 
-            <div id="main-scroll-container" className="flex-1 relative overflow-y-auto w-full flex flex-col items-center">
-              <div className="absolute inset-0 z-0">
-                  <Hero3D />
-              </div>
+            <div className="relative pt-24 pb-20 px-4 container mx-auto flex flex-col items-center text-center z-10 w-full max-w-6xl">
+              
+              <motion.div variants={containerVariants} initial="hidden" animate="show" className="flex flex-wrap justify-center gap-3 mb-10">
+                {taglines.map((tag, i) => (
+                  <motion.div key={i} variants={itemVariants} className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/50 dark:bg-white/5 border border-black/5 dark:border-white/10 backdrop-blur-md shadow-sm dark:shadow-xl">
+                    {tag.icon}
+                    <span className="text-sm font-medium text-zinc-700 dark:text-gray-200">{tag.text}</span>
+                  </motion.div>
+                ))}
+              </motion.div>
 
-              <div className="relative pt-24 pb-20 px-4 container mx-auto flex flex-col items-center text-center z-10 w-full max-w-6xl">
-                <motion.div variants={containerVariants} initial="hidden" animate="show" className="flex flex-wrap justify-center gap-3 mb-10">
-                  {taglines.map((tag, i) => (
-                    <motion.div key={i} variants={itemVariants} className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md shadow-xl">
-                      {tag.icon}
-                      <span className="text-sm font-medium text-gray-200">{tag.text}</span>
-                    </motion.div>
-                  ))}
-                </motion.div>
-
-                <motion.h1 
-                  initial={{ opacity: 0, y: 30 }} 
-                  animate={{ opacity: 1, y: 0 }} 
-                  transition={{ delay: 0.6, duration: 0.8, ease: "easeOut" }} 
-                  className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight"
+              <motion.h1 
+                initial={{ opacity: 0, y: 30 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                transition={{ delay: 0.6, duration: 0.8, ease: "easeOut" }} 
+                className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight"
+              >
+                Connect with Anyone. <br />
+                <motion.span 
+                  animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                  transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                  className="bg-[length:200%_auto] bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 via-cyan-400 to-indigo-600 dark:from-indigo-400 dark:via-cyan-200 dark:to-indigo-500 inline-block pb-2"
                 >
-                  Connect with Anyone. <br />
-                  <motion.span 
-                    animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-                    transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
-                    className="bg-[length:200%_auto] bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-cyan-200 to-indigo-500 inline-block pb-2"
-                  >
-                    Amplify Your Reach.
-                  </motion.span>
-                </motion.h1>
+                  Amplify Your Reach.
+                </motion.span>
+              </motion.h1>
 
-                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.0 }} className="mt-6 text-lg md:text-xl text-gray-400 max-w-2xl">
-                  Plan, launch, and host high-fidelity video meetings all from one powerful dashboard. Manage your entire communication stack without the chaos.
-                </motion.p>
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.0 }} className="mt-6 text-lg md:text-xl text-zinc-600 dark:text-gray-400 max-w-2xl">
+                Plan, launch, and host high-fidelity video meetings all from one powerful dashboard.
+              </motion.p>
 
-                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 1.2, type: "spring" }} className="mt-12 w-full max-w-2xl relative">
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 1.2, type: "spring" }} className="mt-12 w-full max-w-2xl relative">
+                <div className="relative transition-all duration-500">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/30 to-cyan-500/30 rounded-[1.25rem] blur opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
                   
-                  <div className="relative transition-all duration-500">
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/30 to-cyan-500/30 rounded-[1.25rem] blur opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
-                    
-                    <Card className="relative p-3 bg-black/40 border border-white/10 backdrop-blur-2xl flex flex-col sm:flex-row gap-3 shadow-[0_8px_32px_0_rgba(31,38,135,0.2)] rounded-2xl group">
+                  <Card className="relative p-3 bg-white/70 dark:bg-black/40 border border-zinc-200 dark:border-white/10 backdrop-blur-2xl flex flex-col sm:flex-row gap-3 shadow-[0_8px_32px_0_rgba(31,38,135,0.1)] dark:shadow-[0_8px_32px_0_rgba(31,38,135,0.2)] rounded-2xl group">
+                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto relative group/btn">
+                      <Button 
+                        size="lg" 
+                        className={`w-full h-14 text-base font-semibold transition-all duration-300 rounded-xl border ${
+                          isLoggedIn 
+                            ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)] border-indigo-400/20" 
+                            : "bg-zinc-200 dark:bg-zinc-800/80 text-zinc-500 dark:text-zinc-400 border-black/5 dark:border-white/5 blur-[1.5px] group-hover/btn:blur-none opacity-80"
+                        }`} 
+                        onClick={startNewMeeting} 
+                        disabled={isCreating}
+                      >
+                        {isLoggedIn ? <Video className="w-5 h-5 mr-2" /> : <Lock className="w-5 h-5 mr-2" />}
+                        {isCreating ? 'Creating...' : isLoggedIn ? 'New Meeting' : 'Log in to Host'}
+                      </Button>
+                    </motion.div>
+
+                    <div className="flex-1 flex gap-2">
+                      <div className="relative flex-1 group/input">
+                        <Keyboard className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 dark:text-gray-500 group-focus-within/input:text-indigo-500 transition-colors" />
+                        <Input 
+                          placeholder="Enter meeting code" 
+                          className="pl-12 h-14 bg-zinc-100 dark:bg-white/5 border-transparent dark:border-white/5 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-gray-600 focus-visible:ring-1 focus-visible:ring-indigo-500/50 text-lg rounded-xl transition-all"
+                          value={meetingCode}
+                          onChange={(e) => setMeetingCode(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && joinMeeting()}
+                        />
+                      </div>
                       
-                      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto relative group/btn">
-                        <Button 
-                          size="lg" 
-                          className={`w-full h-14 text-base font-semibold transition-all duration-300 rounded-xl border ${
-                            isLoggedIn 
-                              ? "bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.5)] border-indigo-400/20 text-white" 
-                              : "bg-zinc-800/80 text-zinc-400 border-white/5 blur-[1.5px] group-hover/btn:blur-none opacity-80"
-                          }`} 
-                          onClick={startNewMeeting} 
-                          disabled={isCreating}
-                        >
-                          {isLoggedIn ? (
-                            <Video className="w-5 h-5 mr-2" />
-                          ) : (
-                            <Lock className="w-5 h-5 mr-2" />
-                          )}
-                          
-                          {isCreating ? 'Creating...' : isLoggedIn ? 'New Meeting' : 'Log in to Host'}
+                      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                        <Button size="lg" variant="secondary" className="h-14 px-8 font-semibold bg-zinc-200 dark:bg-white/10 text-zinc-800 dark:text-white hover:bg-zinc-300 dark:hover:bg-white/20 border border-transparent dark:border-white/10 backdrop-blur-md rounded-xl transition-all" disabled={!meetingCode} onClick={joinMeeting}>
+                          Join
                         </Button>
                       </motion.div>
+                    </div>
+                  </Card>
+                </div>
+              </motion.div>
 
-                      <div className="flex-1 flex gap-2">
-                        <div className="relative flex-1 group/input">
-                          <Keyboard className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within/input:text-indigo-400 transition-colors" />
-                          <Input 
-                            placeholder="Enter meeting code" 
-                            className="pl-12 h-14 bg-white/5 border-white/5 text-white placeholder:text-gray-600 focus-visible:ring-1 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500/50 text-lg rounded-xl transition-all"
-                            value={meetingCode}
-                            onChange={(e) => setMeetingCode(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && joinMeeting()}
-                          />
-                        </div>
-                        
-                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                          <Button size="lg" variant="secondary" className="h-14 px-8 font-semibold bg-white/10 text-white hover:bg-white/20 border border-white/10 backdrop-blur-md rounded-xl transition-all" disabled={!meetingCode} onClick={joinMeeting}>
-                            Join
-                          </Button>
-                        </motion.div>
-                      </div>
-                    </Card>
-                  </div>
-                </motion.div>
-
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }} className="mt-8 mb-32">
-                  <div className="flex flex-col items-center gap-3">
-                      <span className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Or try instantly</span>
-                      <Button variant="outline" className="border-white/20 hover:bg-white/10 text-white bg-transparent" onClick={startGuestSession}>
-                        <Zap className="w-4 h-4 mr-2" /> 
-                        Start 5-Min Guest Chat
-                      </Button>
-                  </div>
-                </motion.div>
-                
-                <FeaturesGrid />
-                <PricingSection />
-                <FaqSection />
-                <Footer />
-                <ScrollToTop />
-              </div>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }} className="mt-8 mb-32">
+                <div className="flex flex-col items-center gap-3">
+                    <span className="text-xs text-zinc-500 dark:text-gray-500 uppercase tracking-widest font-semibold">Or try instantly</span>
+                    <Button variant="outline" className="border-zinc-300 dark:border-white/20 hover:bg-zinc-100 dark:hover:bg-white/10 text-zinc-700 dark:text-white bg-transparent" onClick={startGuestSession}>
+                      <Zap className="w-4 h-4 mr-2" /> 
+                      Start 5-Min Guest Chat
+                    </Button>
+                </div>
+              </motion.div>
+              
+              <FeaturesGrid />
+              <PricingSection />
+              <FaqSection />
+              <Footer />
+              <ScrollToTop />
             </div>
           </div>
-        </motion.main>
-      )}
-    </AnimatePresence>
+        </div>
+      </motion.main>
+    </>
   );
 }

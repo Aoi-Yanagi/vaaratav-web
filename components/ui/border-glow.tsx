@@ -6,13 +6,17 @@ interface BorderGlowProps {
   color?: string;
 }
 
-export default function BorderGlow({ color = "from-indigo-500 via-cyan-400 to-indigo-500" }: BorderGlowProps) {
+export default function BorderGlow({ 
+  // Added a slightly deeper gradient for light mode, and preserved your bright gradient for dark mode
+  color = "from-indigo-600 via-cyan-500 to-indigo-600 dark:from-indigo-500 dark:via-cyan-400 dark:to-indigo-500" 
+}: BorderGlowProps) {
   return (
-    <div className="absolute inset-[-2px] -z-10 rounded-3xl overflow-hidden pointer-events-none">
+    <div className="absolute inset-[-2px] -z-10 rounded-3xl overflow-hidden pointer-events-none transition-colors duration-500">
       {/* 1. THE GRADIENT PATH */}
-      {/* A massive gradient rectangle that will move around */}
-      <div className={`absolute -inset-[300px] blur-[3px] opacity-70`}>
-        <div className={`h-full w-full bg-gradient-to-r ${color} shadow-[0_0_15px_6px_rgba(99,102,241,0.5)]`} />
+      {/* Softened opacity for light mode so it doesn't blind the user */}
+      <div className={`absolute -inset-[300px] blur-[3px] opacity-40 dark:opacity-70 transition-opacity duration-500`}>
+        {/* Adjusted the shadow to be lighter in light mode, stronger in dark mode */}
+        <div className={`h-full w-full bg-gradient-to-r ${color} shadow-[0_0_15px_6px_rgba(99,102,241,0.2)] dark:shadow-[0_0_15px_6px_rgba(99,102,241,0.5)] transition-shadow duration-500`} />
       </div>
 
       {/* 2. THE SVG MASK & MASK ANIMATION */}
@@ -37,7 +41,7 @@ export default function BorderGlow({ color = "from-indigo-500 via-cyan-400 to-in
               y="-2"
               width="104"
               height="104"
-              rx="6" // Match the card's rounded corner radius (approx.)
+              rx="6" // Match the card's rounded corner radius
               fill="none"
               stroke="url(#glow-gradient)"
               strokeWidth="4"
@@ -57,7 +61,15 @@ export default function BorderGlow({ color = "from-indigo-500 via-cyan-400 to-in
         </defs>
         
         {/* The rectangle that finally gets masked */}
-        <rect width="100%" height="100%" fill="none" mask="url(#glow-mask)" />
+        <rect 
+          x="0" 
+          y="0" 
+          width="100" 
+          height="100" 
+          fill="currentColor" 
+          mask="url(#glow-mask)" 
+          className="text-white"
+        />
       </svg>
     </div>
   );

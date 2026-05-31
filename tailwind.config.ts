@@ -3,13 +3,12 @@ import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate"; // FIX 1: Import properly
 
 const config = {
-  darkMode: ["class", "class"], // FIX 2: Change ["class"] to just "class"
+  darkMode: ["class"], 
+  
   content: [
-    './pages/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './app/**/*.{ts,tsx}',
-    './src/**/*.{ts,tsx}',
-    './lib/**/*.{ts,tsx}',
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   prefix: "",
   theme: {
@@ -92,7 +91,7 @@ const config = {
   		}
   	}
   },
-  plugins: [tailwindcssAnimate, require("tailwindcss-animate")], // FIX 1: Use the imported variable
+ plugins: [tailwindcssAnimate], // FIX 1: Use the imported variable
 } satisfies Config;
 
 export default config;

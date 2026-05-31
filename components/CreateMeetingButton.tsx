@@ -19,9 +19,7 @@ export function CreateMeetingButton() {
       const data = await response.json();
       
       if (data.meetingCode) {
-        // Redirect the user straight into their new room!
-        // (Adjust this route if your room page is located elsewhere, e.g., /room/[id])
-        router.push("/meeting/${data.meetingCode}")
+        router.push(`/meeting/${data.meetingCode}`)
       } else {
         console.error("Failed to generate meeting code:", data.error);
         setIsLoading(false);
@@ -36,7 +34,7 @@ export function CreateMeetingButton() {
     <Button 
       onClick={handleCreateMeeting}
       disabled={isLoading}
-      className="h-14 bg-indigo-600 hover:bg-indigo-700 justify-start text-lg px-6 w-full transition-all disabled:opacity-70"
+      className="h-14 bg-indigo-600 hover:bg-indigo-700 text-white justify-start text-lg px-6 w-full transition-all disabled:opacity-70 dark:bg-indigo-600 dark:hover:bg-indigo-700"
     >
       {isLoading ? (
         <Loader2 className="mr-3 w-6 h-6 animate-spin" />

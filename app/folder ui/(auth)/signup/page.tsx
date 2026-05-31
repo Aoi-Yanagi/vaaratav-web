@@ -3,9 +3,9 @@
 import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation"; // <-- NEW IMPORT
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Video, Zap, Shield, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Video, Zap, Shield, AlertCircle } from "lucide-react"; // <-- Added AlertCircle
 import { motion } from "framer-motion";
 
 const newFeatures = [
@@ -20,9 +20,12 @@ const welcomeMessages = [
   "Start hosting secure, fast meetings today.",
 ];
 
+// 1. Separate the main logic into a Content component
 function SignupContent() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [message, setMessage] = useState("Experience seamless video.");
+  
+  // 2. Hook to read URL parameters
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
 
@@ -30,6 +33,7 @@ function SignupContent() {
     const timer = setTimeout(() => {
       setMessage(welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)]);
     }, 0);
+
     return () => clearTimeout(timer);
   }, []);
 
@@ -40,29 +44,38 @@ function SignupContent() {
     } catch (err) {
       console.error("Signup error:", err);
     } finally {
-      setIsGoogleLoading(false);
+      setIsGoogleLoading(false); // Reset loading if it fails locally
     }
   };
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-      className="w-full max-w-lg bg-white/80 dark:bg-neutral-900/60 backdrop-blur-2xl border border-zinc-200 dark:border-white/10 rounded-[2rem] p-8 shadow-2xl relative z-10 flex flex-col md:flex-row gap-8 transition-colors"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="w-full max-w-lg bg-neutral-900/60 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-8 shadow-2xl relative z-10 flex flex-col md:flex-row gap-8"
     >
-      <Link href="/" className="absolute top-6 left-6 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors flex items-center text-sm font-medium group z-20">
+      <Link href="/" className="absolute top-6 left-6 text-zinc-400 hover:text-white transition-colors flex items-center text-sm font-medium group z-20">
         <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
         Home
       </Link>
 
-      <div className="hidden md:flex flex-col justify-center flex-1 border-r border-zinc-200 dark:border-white/10 pr-8 mt-8 transition-colors">
-        <h2 className="text-xl font-bold text-zinc-900 dark:text-white mb-6">Why VaartaV?</h2>
+      {/* Left Side: App Features */}
+      <div className="hidden md:flex flex-col justify-center flex-1 border-r border-white/10 pr-8 mt-8">
+        <h2 className="text-xl font-bold text-white mb-6">Why VaartaV?</h2>
         <div className="space-y-6">
           {newFeatures.map((feature, idx) => {
             const Icon = feature.icon;
             return (
-              <motion.div key={idx} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 + (idx * 0.1) }} className="flex items-center gap-3 text-zinc-600 dark:text-zinc-300">
-                <div className="bg-zinc-100 dark:bg-white/5 p-2 rounded-lg">
-                  <Icon className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+              <motion.div 
+                key={idx}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 + (idx * 0.1) }}
+                className="flex items-center gap-3 text-zinc-300"
+              >
+                <div className="bg-white/5 p-2 rounded-lg">
+                  <Icon className="w-5 h-5 text-teal-400" />
                 </div>
                 <span className="text-sm font-medium">{feature.text}</span>
               </motion.div>
@@ -71,24 +84,33 @@ function SignupContent() {
         </div>
       </div>
 
+      {/* Right Side: Action Area */}
       <div className="flex-1 flex flex-col justify-center mt-12 md:mt-0">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight mb-3 transition-colors">Join Us</h1>
-          <motion.p key={message} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="text-teal-600/80 dark:text-teal-200/80 text-sm font-medium">
+          <h1 className="text-3xl font-bold text-white tracking-tight mb-3">Join Us</h1>
+          <motion.p 
+            key={message}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="text-teal-200/80 text-sm font-medium"
+          >
             {message}
           </motion.p>
         </div>
 
+        {/* NEW: Error Message Display */}
         {error && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-600 dark:text-red-400 text-sm p-3 rounded-lg flex items-center justify-center mb-4">
+          <div className="bg-red-500/10 border border-red-500/50 text-red-400 text-sm p-3 rounded-lg flex items-center justify-center mb-4">
             <AlertCircle className="w-4 h-4 mr-2" />
             Signup failed. Please try again.
           </div>
         )}
 
         <Button 
-          onClick={handleGoogleSignUp} disabled={isGoogleLoading}
-          className="w-full h-14 bg-zinc-900 dark:bg-white text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 hover:scale-[1.02] active:scale-95 font-bold rounded-xl text-base transition-all duration-200 shadow-lg"
+          onClick={handleGoogleSignUp} 
+          disabled={isGoogleLoading}
+          className="w-full h-14 bg-white text-black hover:bg-zinc-200 hover:scale-[1.02] active:scale-95 font-bold rounded-xl text-base transition-all duration-200"
         >
           {isGoogleLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : (
             <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
@@ -103,7 +125,7 @@ function SignupContent() {
 
         <p className="text-center text-zinc-500 text-sm mt-8">
           Already registered?{" "}
-          <Link href="/login" className="text-zinc-900 dark:text-white hover:text-teal-600 dark:hover:text-teal-400 transition-colors font-medium underline underline-offset-4 decoration-zinc-900/20 dark:decoration-white/20">
+          <Link href="/login" className="text-white hover:text-teal-400 transition-colors font-medium underline underline-offset-4 decoration-white/20">
             Log in here
           </Link>
         </p>
@@ -112,14 +134,19 @@ function SignupContent() {
   );
 }
 
+// 3. Main Page wrapper providing the required Suspense boundary
 export default function SignupPage() {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-500">
+    <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Signup gets an Emerald/Teal glow to differentiate from Login */}
       <motion.div 
-        initial={{ opacity: 0, scale: 1.2 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1.5, ease: "easeOut" }}
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-teal-500/10 dark:bg-teal-600/10 rounded-full blur-[120px] pointer-events-none"
+        initial={{ opacity: 0, scale: 1.2 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 1.5, ease: "easeOut" }}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-teal-600/10 rounded-full blur-[120px] pointer-events-none"
       />
-      <Suspense fallback={<div className="text-zinc-900 dark:text-white">Loading...</div>}>
+
+      <Suspense fallback={<div className="text-white">Loading...</div>}>
         <SignupContent />
       </Suspense>
     </div>

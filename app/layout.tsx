@@ -1,14 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Outfit } from "next/font/google"; // <-- Changed from Geist
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Analytics } from "@vercel/analytics/next"
-
-// --- CHANGED: We now only need to import the ONE unified Providers file ---
 import { Providers } from "@/components/Providers";
 
-const inter = Geist({
-  variable: "--font-geist-sans",
+const outfit = Outfit({
+  variable: "--font-sans",
   subsets: ["latin"],
 });
 
@@ -31,9 +29,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // Add next-themes required hydration suppression
     <html lang="en" suppressHydrationWarning>
-      <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>
-        {/* The unified provider wraps everything securely on the client side */}
+      <body className={cn("min-h-screen bg-background font-sans antialiased", outfit.variable)}>
         <Providers> 
            {children}
         </Providers>    

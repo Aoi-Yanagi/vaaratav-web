@@ -4,7 +4,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="w-full min-h-screen bg-zinc-50 dark:bg-black transition-colors duration-500">
+    <div className="w-full min-h-screen bg-black">
       {/* This magic {children} prop is what actually renders your login/signup pages! */}
       {children} 
     </div>

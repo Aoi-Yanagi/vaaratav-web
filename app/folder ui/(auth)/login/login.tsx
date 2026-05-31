@@ -3,9 +3,9 @@
 import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation"; // <-- NEW IMPORT
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Sparkles, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Sparkles, AlertCircle } from "lucide-react"; // <-- Added AlertCircle
 import { motion } from "framer-motion";
 
 const returningMessages = [
@@ -15,10 +15,13 @@ const returningMessages = [
   "Ready to host your next big idea?",
 ];
 
+// We separate the main content so we can wrap it in Suspense (required for useSearchParams in Next.js App Router)
 function LoginContent() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [message, setMessage] = useState("Welcome back.");
   const searchParams = useSearchParams();
+  
+  // Extract error from URL if NextAuth fails
   const error = searchParams.get("error");
 
   useEffect(() => {
@@ -35,45 +38,58 @@ function LoginContent() {
     } catch (error) {
       console.error("Sign in error:", error);
     } finally {
+      // Note: signIn usually redirects, but if it fails immediately client-side, we reset loading
       setIsGoogleLoading(false); 
     }
   };
 
   return (
-    <div className="w-full max-w-md bg-white/80 dark:bg-neutral-900/60 backdrop-blur-2xl border border-zinc-200 dark:border-white/10 rounded-[2rem] p-8 shadow-2xl relative z-10 transition-colors">
-      <Link href="/" className="absolute top-6 left-6 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors flex items-center text-sm font-medium group">
+    <div className="w-full max-w-md bg-neutral-900/60 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-8 shadow-2xl relative z-10">
+      <Link href="/" className="absolute top-6 left-6 text-zinc-400 hover:text-white transition-colors flex items-center text-sm font-medium group">
         <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
         Home
       </Link>
 
       <div className="text-center mt-12 mb-10">
         <motion.div 
-          initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-          className="w-12 h-12 bg-indigo-500/10 dark:bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-indigo-500/20 dark:border-indigo-500/30"
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+          className="w-12 h-12 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-indigo-500/30"
         >
-          <Sparkles className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+          <Sparkles className="w-6 h-6 text-indigo-400" />
         </motion.div>
-        <h1 className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight mb-3 transition-colors">Sign In</h1>
+        <h1 className="text-3xl font-bold text-white tracking-tight mb-3">Sign In</h1>
         
         <motion.p 
-          key={message} initial={{ opacity: 0, filter: "blur(4px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} transition={{ delay: 0.4, duration: 0.5 }}
-          className="text-indigo-600/80 dark:text-indigo-200/80 text-sm font-medium"
+          key={message}
+          initial={{ opacity: 0, filter: "blur(4px)" }}
+          animate={{ opacity: 1, filter: "blur(0px)" }}
+          transition={{ delay: 0.4, duration: 0.5 }}
+          className="text-indigo-200/80 text-sm font-medium"
         >
           {message}
         </motion.p>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="space-y-4">
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className="space-y-4"
+      >
+        {/* NEW: Error Message Display */}
         {error && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-600 dark:text-red-400 text-sm p-3 rounded-lg flex items-center justify-center mb-4">
+          <div className="bg-red-500/10 border border-red-500/50 text-red-400 text-sm p-3 rounded-lg flex items-center justify-center mb-4">
             <AlertCircle className="w-4 h-4 mr-2" />
             Authentication failed. Please try again.
           </div>
         )}
 
         <Button 
-          onClick={handleGoogleSignIn} disabled={isGoogleLoading}
-          className="w-full h-14 bg-zinc-900 dark:bg-white text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 hover:scale-[1.02] active:scale-95 font-bold rounded-xl text-base transition-all duration-200 shadow-lg dark:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+          onClick={handleGoogleSignIn} 
+          disabled={isGoogleLoading}
+          className="w-full h-14 bg-white text-black hover:bg-zinc-200 hover:scale-[1.02] active:scale-95 font-bold rounded-xl text-base transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
         >
           {isGoogleLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : (
             <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
@@ -89,7 +105,7 @@ function LoginContent() {
 
       <p className="text-center text-zinc-500 text-sm mt-8">
         Don&apos;t have an account?{" "}
-        <Link href="/signup" className="text-zinc-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium underline underline-offset-4 decoration-zinc-900/20 dark:decoration-white/20">
+        <Link href="/signup" className="text-white hover:text-indigo-400 transition-colors font-medium underline underline-offset-4 decoration-white/20">
           Create one now
         </Link>
       </p>
@@ -99,12 +115,15 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-500">
+    <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
       <motion.div 
-        initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1.5, ease: "easeOut" }}
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none"
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 1.5, ease: "easeOut" }}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none"
       />
-      <Suspense fallback={<div className="text-zinc-900 dark:text-white">Loading...</div>}>
+      {/* Suspense is required when using useSearchParams in Next.js */}
+      <Suspense fallback={<div className="text-white">Loading...</div>}>
         <LoginContent />
       </Suspense>
     </div>
