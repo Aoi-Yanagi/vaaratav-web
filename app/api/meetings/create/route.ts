@@ -1,44 +1,47 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-// --- CHANGED: We now import our centralized auth and database instance ---
-import { authOptions, prisma } from "@/lib/auth";
+import { authOptions } from "@/lib/auth";
+// 1. IMPORT DB FROM THE NEW LOCATION
+import { db } from "@/lib/db"; 
 
 export async function POST() {
   try {
-    // 1. Verify the user is authenticated securely
     const session = await getServerSession(authOptions);
+
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Find the user in the database to get their ID
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+    // 2. USE 'db' INSTEAD OF 'prisma'
+    const user = await db.user.findUnique({
+      where: { email: session.user.email }
     });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // 3. Generate a secure, unique room code (e.g., "vrtv-8f7d-4b2a")
-    const rawUuid = crypto.randomUUID();
-    const meetingCode = `vrtv-${rawUuid.substring(0, 4)}-${rawUuid.substring(4, 8)}`;
+    // Generate a secure, random 9-character meeting code
+    const generateCode = () => Math.random().toString(36).substring(2, 11);
+    const meetingCode = generateCode();
 
-    // 4. Create the meeting in the database
-    const newMeeting = await prisma.meeting.create({
+    // 3. USE 'db' INSTEAD OF 'prisma' TO CREATE THE MEETING
+    const newMeeting = await db.meeting.create({
       data: {
-        title: `${session.user.name?.split(" ")[0] || "User"}'s Meeting`,
+        title: `${user.name?.split(" ")[0] || "Guest"}'s Meeting`,
         meetingCode: meetingCode,
         hostId: user.id,
-        status: "WAITING", 
-        startTime: new Date(),
-      },
+        status: "WAITING",
+      }
     });
 
-    // 5. Return the code so the frontend can redirect the user
-    return NextResponse.json({ success: true, meetingCode: newMeeting.meetingCode });
+    return NextResponse.json({ meetingCode: newMeeting.meetingCode });
+    
   } catch (error) {
     console.error("Failed to create meeting:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" }, 
+      { status: 500 }
+    );
   }
 }

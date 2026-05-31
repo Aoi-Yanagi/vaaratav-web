@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-// --- CHANGED: We now import our centralized auth and database instance ---
-import { authOptions, prisma } from "@/lib/auth";
+import { authOptions } from "@/lib/auth"; // Import only auth options from here
+import { db } from "@/lib/db"; // Import your database instance from here
 
 export async function POST(req: Request) {
   try {
@@ -19,7 +19,8 @@ export async function POST(req: Request) {
     }
 
     // Update the meeting status to COMPLETED and set the exact end time
-    const updatedMeeting = await prisma.meeting.update({
+    // Changed `prisma.meeting` to `db.meeting` to match your setup
+    const updatedMeeting = await db.meeting.update({
       where: { meetingCode: meetingCode },
       data: {
         status: "COMPLETED",

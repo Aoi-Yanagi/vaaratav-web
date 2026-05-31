@@ -12,11 +12,16 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "avatars.githubusercontent.com", // For GitHub profile pictures
+        hostname: "github.com",
+        port: "",
+        pathname: "/**",
       },
+      // If you have Google Auth, you likely already have this one below!
       {
         protocol: "https",
-        hostname: "lh3.googleusercontent.com", // For Google profile pictures
+        hostname: "*.googleusercontent.com",
+        port: "",
+        pathname: "/**",
       },
     ],
   },

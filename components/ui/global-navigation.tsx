@@ -6,9 +6,9 @@ import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-// FIX 1: Removed 'Settings' from this import list
-import { LogOut, LayoutDashboard, Sun, Moon } from "lucide-react"; 
+import { LogOut, LayoutDashboard, Sun, Moon, UserCircle } from "lucide-react"; 
 import { useTheme } from "next-themes";
+import { UserProfileModal } from "@/components/UserProfileModal";
 
 export default function GlobalNavigation() {
   const { data: session } = useSession();
@@ -19,10 +19,10 @@ export default function GlobalNavigation() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // FIX 2: Wrapped in setTimeout to prevent the "cascading renders" linter warning
     const mountTimer = setTimeout(() => setMounted(true), 0);
     
     const handleClickOutside = (event: MouseEvent) => {
+      // Don't close the dropdown if we are interacting with the Dialog portal (which is attached to the body)
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
@@ -35,6 +35,9 @@ export default function GlobalNavigation() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  const displayName = session?.user?.name || "Guest User";
+  const displayEmail = session?.user?.email || "";
 
   return (
     <nav className="absolute top-0 w-full z-50 bg-white/70 dark:bg-black/20 backdrop-blur-md border-b border-black/5 dark:border-white/10 p-4 flex justify-between items-center transition-colors">
@@ -63,13 +66,19 @@ export default function GlobalNavigation() {
               className="relative cursor-pointer transition-transform hover:scale-105"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
-              <Image
-                src={session.user?.image || "https://github.com/ghost.png"}
-                alt="User Avatar"
-                width={40} 
-                height={40}
-                className="rounded-full border-2 border-indigo-500/50 hover:border-indigo-400 transition-all shadow-lg object-cover"
-              />
+              {session.user?.image ? (
+                <Image
+                  src={session.user.image}
+                  alt="User Avatar"
+                  width={40}
+                  height={40}
+                  className="rounded-full border-2 border-zinc-200 dark:border-white/10"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white font-bold text-lg border-2 border-white/10 shadow-lg">
+                  {displayName !== "Guest User" ? displayName.charAt(0).toUpperCase() : displayEmail.charAt(0).toUpperCase() || "U"}
+                </div>
+              )}
             </div>
 
             <AnimatePresence>
@@ -82,8 +91,8 @@ export default function GlobalNavigation() {
                   className="absolute top-14 right-0 w-64 bg-white dark:bg-zinc-900/95 backdrop-blur-2xl border border-zinc-200 dark:border-white/10 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden"
                 >
                   <div className="px-4 py-3 border-b border-zinc-100 dark:border-white/10 mb-1 bg-zinc-50 dark:bg-white/5">
-                    <p className="text-sm font-bold text-zinc-900 dark:text-white truncate">{session.user?.name}</p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">{session.user?.email}</p>
+                    <p className="text-sm font-bold text-zinc-900 dark:text-white truncate">{displayName}</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">{displayEmail}</p>
                   </div>
 
                   <div className="flex flex-col">
@@ -94,6 +103,13 @@ export default function GlobalNavigation() {
                     >
                       <LayoutDashboard className="w-4 h-4" /> Dashboard
                     </Link>
+
+                    {/* NEW PROFILE SETTINGS TRIGGER */}
+                    <UserProfileModal currentName={displayName}>
+                      <button className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors w-full text-left">
+                        <UserCircle className="w-4 h-4" /> Profile Settings
+                      </button>
+                    </UserProfileModal>
                     
                     <div className="h-px w-full bg-zinc-200 dark:bg-white/10 my-1" />
                     

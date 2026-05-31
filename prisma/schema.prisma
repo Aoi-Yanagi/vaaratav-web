@@ -3,9 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" 
-  // Note: The 'url' property has been safely removed for Prisma 7 compatibility. 
-  // Prisma will now read the connection URL directly from your prisma.config.ts file!
+  provider = "postgresql"
 }
 
 // --------------------------------------
@@ -69,6 +67,7 @@ model Meeting {
   title       String
   meetingCode String    @unique
   status      String    @default("WAITING") // Can be "WAITING" or "COMPLETED"
+  isFavorite  Boolean  @default(false)
   
   // Timestamps for your dashboard analytics
   startTime   DateTime? 

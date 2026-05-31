@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, Video, PlusSquare, Calendar, Menu, X } from 'lucide-react';
+import { Home, LayoutDashboard, Star, Calendar, Clock, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
@@ -10,11 +10,13 @@ export default function Sidebar(){
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   
+  // FIX: Replaced dummy routes with functional Dashboard anchor links!
   const sidebarLinks = [
-    { imgURL: Home, route: '/', label: 'Home' },
-    { imgURL: Video, route: '/upcoming', label: 'Upcoming' },
-    { imgURL: Calendar, route: '/previous', label: 'Previous' },
-    { imgURL: PlusSquare, route: '/recordings', label: 'Recordings' },
+    { imgURL: Home, route: '/', label: 'Landing Page' },
+    { imgURL: LayoutDashboard, route: '/dashboard', label: 'Main Dashboard' },
+    { imgURL: Star, route: '/dashboard#favorites', label: 'Starred' },
+    { imgURL: Calendar, route: '/dashboard#upcoming', label: 'Upcoming' },
+    { imgURL: Clock, route: '/dashboard#history', label: 'History' },
   ];
 
   const overlayVariants: Variants = {
@@ -77,7 +79,8 @@ export default function Sidebar(){
               className="fixed top-40 left-6 z-[60] flex flex-col gap-4"
             >
               {sidebarLinks.map((link) => {
-                const isActive = pathname === link.route;
+                // Determine if this is the currently active page (ignoring the hash links so they act like shortcut buttons)
+                const isActive = pathname === link.route && !link.route.includes('#');
                 const Icon = link.imgURL;
                 
                 return (
@@ -105,4 +108,4 @@ export default function Sidebar(){
       </AnimatePresence>
     </>
   );
-};
+}

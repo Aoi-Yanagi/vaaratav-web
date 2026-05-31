@@ -1,34 +1,55 @@
 "use client";
 
 import Link from "next/link";
-import { Send, MapPin, Phone, Mail, Twitter, Linkedin, Github, Youtube } from "lucide-react";
+import { useState } from "react";
+import { Send, MapPin, Phone, Mail, Linkedin, Github, Youtube, CheckCircle2 } from "lucide-react";
 
 const menuLinks = [
   { label: 'Home', href: '/' },
-  { label: 'About us', href: '/about' },
-  { label: 'Features', href: '/#features' }, 
-  { label: 'FAQ', href: '/#faq' },           
-  { label: 'Pricing', href: '/#pricing' },   
-  { label: 'Blog', href: '/blog' },
-  { label: 'Contact', href: '/contact' },
+  { label: 'About us', href: '/info/about' },
+  { label: 'Features', href: '/info/features' }, 
+  { label: 'FAQ', href: '/info/faq' },           
+  { label: 'Pricing', href: '/info/pricing' },   
+  { label: 'Blog', href: '/info/blog' },
+  { label: 'Contact', href: '/info/contact' },
 ];
 
 const utilityLinks = [
-  { label: 'Page not found', href: '/404' },
-  { label: 'Password protected', href: '/protected' },
-  { label: 'Changelog', href: '/changelog' },
-  { label: 'Licenses', href: '/licenses' },
-  { label: 'Style guide', href: '/style-guide' },
+  { label: 'System Status', href: '/info/status' }, // Replaced the 404 link here!
+  { label: 'Password protected', href: '/info/protected' },
+  { label: 'Changelog', href: '/info/changelog' },
+  { label: 'Licenses', href: '/info/licenses' },
+  { label: 'Style guide', href: '/info/style-guide' },
 ];
+const XIcon = ({ className }: { className?: string }) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    viewBox="0 0 24 24" 
+    fill="currentColor" 
+    className={className}
+  >
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 22.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
 
 const socialLinks = [
-  { Icon: Twitter, href: 'https://twitter.com', label: 'Twitter' },
+  { Icon: XIcon, href: 'https://x.com', label: 'X' },
   { Icon: Linkedin, href: 'https://linkedin.com', label: 'LinkedIn' },
   { Icon: Github, href: 'https://github.com', label: 'GitHub' },
   { Icon: Youtube, href: 'https://youtube.com', label: 'YouTube' },
 ];
 
 export default function Footer() {
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [email, setEmail] = useState("");
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email) {
+      setIsSubscribed(true);
+    }
+  };
+
   return (
     <footer className="w-full border-t border-zinc-200 dark:border-white/10 bg-white/80 dark:bg-black/50 backdrop-blur-xl pt-20 pb-10 relative z-10 transition-colors duration-500">
       <div className="container mx-auto px-6 lg:px-10">
@@ -47,17 +68,27 @@ export default function Footer() {
             
             <div className="mt-2">
               <p className="text-zinc-900 dark:text-white font-semibold mb-3 text-sm transition-colors">Join our newsletter</p>
-              <form className="relative flex items-center" onSubmit={(e) => e.preventDefault()}>
-                <input 
-                  type="email" 
-                  required
-                  placeholder="Email address" 
-                  className="w-full bg-zinc-50 dark:bg-neutral-900/50 border border-zinc-200 dark:border-white/10 rounded-full py-3 pl-5 pr-12 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-gray-500 focus:outline-none focus:border-indigo-500 transition-colors shadow-sm"
-                />
-                <button type="submit" className="absolute right-1 p-2 bg-indigo-600 hover:bg-indigo-500 rounded-full text-white transition-colors">
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
+              
+              {isSubscribed ? (
+                <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 py-3 px-4 rounded-full">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Thanks for subscribing!</span>
+                </div>
+              ) : (
+                <form className="relative flex items-center" onSubmit={handleSubscribe}>
+                  <input 
+                    type="email" 
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email address" 
+                    className="w-full bg-zinc-50 dark:bg-neutral-900/50 border border-zinc-200 dark:border-white/10 rounded-full py-3 pl-5 pr-12 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-gray-500 focus:outline-none focus:border-indigo-500 transition-colors shadow-sm"
+                  />
+                  <button type="submit" className="absolute right-1 p-2 bg-indigo-600 hover:bg-indigo-500 rounded-full text-white transition-colors">
+                    <Send className="w-4 h-4" />
+                  </button>
+                </form>
+              )}
             </div>
           </div>
 

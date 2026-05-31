@@ -1,73 +1,60 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Settings, Mic, Video, Volume2 } from "lucide-react";
-
-// Mock device lists.
-const CAMERAS = ["FaceTime HD Camera", "Logitech C920", "OBS Virtual Camera"];
-const MICS = ["MacBook Pro Microphone", "Yeti Stereo Microphone", "AirPods Pro"];
-const SPEAKERS = ["MacBook Pro Speakers", "External Headphones"];
+import { useMediaDeviceSelect } from "@livekit/components-react";
 
 export function SettingsDialog() {
+  const { devices: cameras, activeDeviceId: activeCam, setActiveMediaDevice: setCam } = useMediaDeviceSelect({ kind: 'videoinput' });
+  const { devices: mics, activeDeviceId: activeMic, setActiveMediaDevice: setMic } = useMediaDeviceSelect({ kind: 'audioinput' });
+  const { devices: speakers, activeDeviceId: activeSpk, setActiveMediaDevice: setSpk } = useMediaDeviceSelect({ kind: 'audiooutput' });
+
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full hover:bg-zinc-200 dark:hover:bg-neutral-800 text-zinc-600 dark:text-zinc-300 transition-colors">
+        <Button variant="ghost" size="icon" className="rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors">
           <Settings className="w-5 h-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-white dark:bg-neutral-900 border-zinc-200 dark:border-neutral-800 text-zinc-900 dark:text-white transition-colors">
+      <DialogContent className="sm:max-w-[425px] bg-neutral-900 border-zinc-800 text-white transition-colors">
         <DialogHeader>
           <DialogTitle>Audio & Video Settings</DialogTitle>
         </DialogHeader>
         
         <div className="grid gap-6 py-4">
-          
-          {/* Camera Selection */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Video className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> Camera
-            </Label>
-            <select className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-neutral-700 rounded-md p-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
-              {CAMERAS.map((cam) => <option key={cam}>{cam}</option>)}
+            <Label className="flex items-center gap-2"><Video className="w-4 h-4 text-indigo-400" /> Camera</Label>
+            <select 
+              value={activeCam} onChange={(e) => setCam(e.target.value)}
+              className="w-full bg-black border border-zinc-700 rounded-md p-2 text-sm focus:outline-none focus:border-indigo-500"
+            >
+              {cameras.map((cam) => <option key={cam.deviceId} value={cam.deviceId}>{cam.label || "Default Camera"}</option>)}
             </select>
           </div>
 
-          {/* Mic Selection */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Mic className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> Microphone
-            </Label>
-            <select className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-neutral-700 rounded-md p-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
-              {MICS.map((mic) => <option key={mic}>{mic}</option>)}
+            <Label className="flex items-center gap-2"><Mic className="w-4 h-4 text-indigo-400" /> Microphone</Label>
+            <select 
+              value={activeMic} onChange={(e) => setMic(e.target.value)}
+              className="w-full bg-black border border-zinc-700 rounded-md p-2 text-sm focus:outline-none focus:border-indigo-500"
+            >
+              {mics.map((mic) => <option key={mic.deviceId} value={mic.deviceId}>{mic.label || "Default Mic"}</option>)}
             </select>
-            {/* Mic Test Visualizer */}
-            <div className="h-1 w-full bg-zinc-200 dark:bg-neutral-800 rounded-full overflow-hidden transition-colors">
-                <div className="h-full bg-green-500 w-[60%] animate-pulse" />
+          </div>
+
+          {speakers.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2"><Volume2 className="w-4 h-4 text-indigo-400" /> Speakers</Label>
+              <select 
+                value={activeSpk} onChange={(e) => setSpk(e.target.value)}
+                className="w-full bg-black border border-zinc-700 rounded-md p-2 text-sm focus:outline-none focus:border-indigo-500"
+              >
+                {speakers.map((spk) => <option key={spk.deviceId} value={spk.deviceId}>{spk.label || "Default Speaker"}</option>)}
+              </select>
             </div>
-          </div>
-
-          {/* Speaker Selection */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Volume2 className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> Speakers
-            </Label>
-            <select className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-neutral-700 rounded-md p-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
-              {SPEAKERS.map((spk) => <option key={spk}>{spk}</option>)}
-            </select>
-            <Button variant="outline" size="sm" className="w-full border-zinc-200 dark:border-neutral-700 text-xs transition-colors hover:bg-zinc-100 dark:hover:bg-neutral-800">
-              Test Audio
-            </Button>
-          </div>
-
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -5,7 +5,7 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Video, Zap, Shield, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Video, Zap, Shield, AlertCircle, Mail } from "lucide-react";
 import { motion } from "framer-motion";
 
 const newFeatures = [
@@ -22,7 +22,11 @@ const welcomeMessages = [
 
 function SignupContent() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isEmailLoading, setIsEmailLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailSent, setEmailSent] = useState(false);
   const [message, setMessage] = useState("Experience seamless video.");
+  
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
 
@@ -39,9 +43,26 @@ function SignupContent() {
       await signIn("google", { callbackUrl: "/dashboard" });
     } catch (err) {
       console.error("Signup error:", err);
-    } finally {
       setIsGoogleLoading(false);
     }
+  };
+
+  const handleEmailSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsEmailLoading(true);
+    
+    const res = await signIn("email", { 
+      email, 
+      redirect: false,
+      callbackUrl: "/dashboard" 
+    });
+
+    if (res?.ok && !res.error) {
+      setEmailSent(true);
+    } else {
+      alert("Something went wrong. Please check your email configuration.");
+    }
+    setIsEmailLoading(false);
   };
 
   return (
@@ -87,8 +108,8 @@ function SignupContent() {
         )}
 
         <Button 
-          onClick={handleGoogleSignUp} disabled={isGoogleLoading}
-          className="w-full h-14 bg-zinc-900 dark:bg-white text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 hover:scale-[1.02] active:scale-95 font-bold rounded-xl text-base transition-all duration-200 shadow-lg"
+          onClick={handleGoogleSignUp} disabled={isGoogleLoading || isEmailLoading}
+          className="w-full h-14 bg-zinc-900 dark:bg-white text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 hover:scale-[1.02] active:scale-95 font-bold rounded-xl text-base transition-all duration-200 shadow-lg mb-4"
         >
           {isGoogleLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : (
             <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
@@ -100,6 +121,44 @@ function SignupContent() {
           )}
           Sign up with Google
         </Button>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-zinc-200 dark:border-zinc-800"></div>
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white dark:bg-[#1a1a1a] px-4 text-zinc-500 font-medium">Or continue with email</span>
+          </div>
+        </div>
+
+        {/* Email Sign Up */}
+        {emailSent ? (
+          <div className="bg-teal-500/10 border border-teal-500/30 rounded-xl p-4 text-center">
+            <Mail className="w-8 h-8 text-teal-600 dark:text-teal-400 mx-auto mb-2" />
+            <h3 className="font-bold text-teal-700 dark:text-teal-400 mb-1">Check your inbox!</h3>
+            <p className="text-sm text-teal-600/80 dark:text-teal-400/80">
+              We sent a secure sign up link to <br/> <span className="font-semibold text-teal-700 dark:text-teal-300">{email}</span>
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handleEmailSignUp} className="flex flex-col gap-3">
+            <input
+              type="email"
+              placeholder="name@example.com"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full h-14 bg-zinc-50 dark:bg-black/50 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
+            />
+            <Button 
+              type="submit" 
+              disabled={isEmailLoading || isGoogleLoading}
+              className="w-full h-14 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-base font-bold transition-all shadow-lg"
+            >
+              {isEmailLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : "Send Magic Link"}
+            </Button>
+          </form>
+        )}
 
         <p className="text-center text-zinc-500 text-sm mt-8">
           Already registered?{" "}
