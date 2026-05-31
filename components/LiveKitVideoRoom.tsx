@@ -19,7 +19,7 @@ import "@livekit/components-styles";
 import { LocalVideoTrack, RoomEvent, TranscriptionSegment, Participant, Track, DataPacket_Kind, RemoteParticipant } from "livekit-client";
 import { 
   Loader2, Mic, MicOff, Video as VideoIcon, VideoOff, MonitorUp, PhoneOff, 
-  Sparkles, MessageSquare, Send, X, ShieldAlert, MoreVertical, Ban, LogOut, ShieldMinus, ShieldCheck // FIX 2: Imported ShieldCheck!
+  Sparkles, MessageSquare, Send, X, ShieldAlert, MoreVertical, Ban, LogOut, ShieldMinus, ShieldCheck 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Lottie from "lottie-react";
@@ -52,11 +52,11 @@ interface CommandPayload {
   targetIdentity?: string; 
 }
 
-const checkIsHost = (permissions: unknown) => {
-  return (permissions as { roomAdmin?: boolean })?.roomAdmin;
+// FIX 1: Strict boolean return type added. No more 'undefined' tantrums.
+const checkIsHost = (permissions: unknown): boolean => {
+  return (permissions as { roomAdmin?: boolean })?.roomAdmin === true;
 };
 
-// Context for passing admin powers deeply into the UI
 const RoomAdminContext = createContext<{
   isHost: boolean;
   isModerator: boolean;
@@ -120,11 +120,11 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
   const [showEndModal, setShowEndModal] = useState(false);
   const [expandedParticipant, setExpandedParticipant] = useState<string | null>(null); 
 
-  // FIX 1: Wrapped in Boolean() to guarantee a strict boolean type, fixing the Context Provider error.
-  const isActualHost = Boolean(initialIsHost || checkIsHost(localParticipant.permissions));
+  // FIX 1 CONTINUED: Enforcing absolute boolean typing
+  const isActualHost: boolean = initialIsHost === true || checkIsHost(localParticipant.permissions) === true;
   
   const isModerator = moderators.has(localParticipant.identity);
-  const isHostPresent = isActualHost || participants.some(p => checkIsHost(p.permissions));
+  const isHostPresent = isActualHost || participants.some(p => checkIsHost(p.permissions) === true);
 
   // --- DATA CHANNEL LISTENER ---
   useEffect(() => {
@@ -180,7 +180,7 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
 
   useEffect(() => scrollRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
 
-  // FIX 3: Restored the mobile screen tap logic so 'setShowMobileControls' is actively used!
+  // FIX 3: Re-enabled the mobile controls listener to actively use the setShowMobileControls hook!
   useEffect(() => {
     const handleScreenTap = (e: PointerEvent) => {
       const target = e.target as HTMLElement;
@@ -405,7 +405,7 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
               {activeTab === "people" && (
                 <div className="flex-1 p-3 overflow-y-auto space-y-2">
                   {participants.map((p) => {
-                    const pIsAdmin = checkIsHost(p.permissions);
+                    const pIsAdmin = checkIsHost(p.permissions) === true;
                     const pIsMod = moderators.has(p.identity);
                     const hasAuthority = !p.isLocal && (isActualHost || (isModerator && !pIsMod && !pIsAdmin));
                     const isExpanded = expandedParticipant === p.identity;
@@ -507,7 +507,7 @@ export function ParticipantContextOverlay() {
   if (!context) return null;
   const { isHost, isModerator, moderators, executeCommand } = context;
 
-  const pIsHost = checkIsHost(p.permissions);
+  const pIsHost = checkIsHost(p.permissions) === true;
   const pIsMod = moderators.has(p.identity);
   
   const hasAuthority = !p.isLocal && (isHost || (isModerator && !pIsMod && !pIsHost));
