@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 // 1. IMPORT DB FROM THE NEW LOCATION
 import { db } from "@/lib/db"; 
-
+export const dynamic = "force-dynamic";
 export async function POST() {
   try {
     const session = await getServerSession(authOptions);
