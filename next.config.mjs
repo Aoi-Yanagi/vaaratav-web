@@ -11,19 +11,11 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: "https",
-        hostname: "github.com",
-        port: "",
-        pathname: "/**",
-      },
-      // If you have Google Auth, you likely already have this one below!
-      {
-        protocol: "https",
-        hostname: "*.googleusercontent.com",
-        port: "",
-        pathname: "/**",
+        protocol: 'https',
+        hostname: '**', // This wildcard allows images from Google, future upload hosts (like S3/Vercel Blob), and email avatars.
       },
     ],
+    dangerouslyAllowSVG: true, // Helpful if default avatars are generated as SVGs
   },
 };
 

@@ -95,7 +95,13 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
   const router = useRouter();
   const { localParticipant } = useLocalParticipant();
   const participants = useParticipants();
-  const tracks = useTracks([Track.Source.Camera, Track.Source.ScreenShare], { onlySubscribed: false });
+  const tracks = useTracks(
+    [
+      { source: Track.Source.Camera, withPlaceholder: true },
+      { source: Track.Source.ScreenShare, withPlaceholder: false },
+    ],
+    { onlySubscribed: false }
+  );
 
   // UI & Feature States
   const [reactions, setReactions] = useState<Reaction[]>([]);
@@ -329,12 +335,15 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
         <div className="flex-1 flex flex-col w-full max-w-7xl mx-auto p-4 sm:p-6 z-10 min-h-0 pb-32 sm:pb-24 mt-6">
           <div className="flex-1 flex w-full bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm rounded-[2rem] border border-zinc-200 dark:border-white/10 overflow-hidden shadow-xl dark:shadow-2xl relative transition-colors">
              
-             <div className="flex-1 w-full h-full flex flex-col relative p-2">
-                <GridLayout tracks={tracks} style={{ height: '100%', width: '100%' }}>
-                  <ParticipantTile>
-                     <ParticipantContextOverlay />
-                  </ParticipantTile>
-                </GridLayout>
+             {/* FIX: Changed this wrapper to relative and the inner grid to absolute to prevent height collapsing */}
+             <div className="flex-1 w-full h-full relative">
+                <div className="absolute inset-2">
+                  <GridLayout tracks={tracks} style={{ height: '100%', width: '100%' }}>
+                    <ParticipantTile>
+                       <ParticipantContextOverlay />
+                    </ParticipantTile>
+                  </GridLayout>
+                </div>
                 <RoomAudioRenderer />
              </div>
 
