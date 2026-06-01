@@ -80,3 +80,35 @@
 .lk-participant-tile[data-lk-source="screen_share"] video {
   transform: scaleX(1) !important;
 }
+
+/* --------------------------------------------------------
+   LIVEKIT & NEXT.JS STRICT HEIGHT FIX 
+   Forces the browser to give LiveKit a hard boundary
+-------------------------------------------------------- */
+
+/* 1. Lock the Next.js foundation to the exact window size */
+html, 
+body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overscroll-behavior: none;
+}
+
+/* 2. OVERRIDE LIVEKIT'S INTERNAL CSS */
+/* This stops the < 1 of 2 > pagination glitch by forcing the grid open */
+.lk-grid-layout {
+  min-height: 0 !important;
+  height: 100% !important;
+  width: 100% !important;
+  flex: 1 1 auto !important;
+}
+
+/* Ensure the wrapper holding the grid also fills the space */
+.lk-room-container {
+  height: 100% !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}

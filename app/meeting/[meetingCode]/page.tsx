@@ -8,8 +8,6 @@ import { LiveKitVideoRoom } from "@/components/LiveKitVideoRoom";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export const dynamic = "force-dynamic";
-
 export default function MeetingLobby({ params }: { params: Promise<{ meetingCode: string }> }) {
   const router = useRouter();
   const unwrappedParams = use(params);
@@ -23,13 +21,14 @@ export default function MeetingLobby({ params }: { params: Promise<{ meetingCode
   const [token, setToken] = useState("");
   const [isHost, setIsHost] = useState(false); 
   const [isJoining, setIsJoining] = useState(false);
-  
   const meetingLink = typeof window !== "undefined" ? `${window.location.origin}/meeting/${meetingCode}` : "";
   
+  // States
   const [title, setTitle] = useState("VaartaV Sync");
   const [isRenaming, setIsRenaming] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const [scheduleData, setScheduleData] = useState({ date: "", time: "" });
 
   const copyLink = () => {
@@ -74,7 +73,7 @@ export default function MeetingLobby({ params }: { params: Promise<{ meetingCode
         body: JSON.stringify({ meetingCode, title, ...scheduleData })
       });
       setIsScheduling(false);
-      alert("Meeting scheduled successfully!");
+      alert("Meeting scheduled successfully! An email reminder has been sent.");
     } catch (error) { console.error(error); } 
     finally { setIsSubmitting(false); }
   };
@@ -92,7 +91,7 @@ export default function MeetingLobby({ params }: { params: Promise<{ meetingCode
       }
 
       setToken(data.token);
-      setIsHost(data.isHost || false); 
+      setIsHost(data.isHost || false); // Capture the host status
       setHasJoined(true);
     } catch (error) {
       console.error(error);
@@ -103,7 +102,7 @@ export default function MeetingLobby({ params }: { params: Promise<{ meetingCode
 
   if (status === "loading") return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>;
 
-  // THE MAGIC FIX IS HERE: Notice `isHost={isHost}` is now attached!
+  // 🚨 THE MAGIC FIX IS HERE: isHost={isHost} is now passed to the room!
   if (hasJoined && token) {
     return <LiveKitVideoRoom roomCode={meetingCode} token={token} isHost={isHost} />;
   }
@@ -111,11 +110,20 @@ export default function MeetingLobby({ params }: { params: Promise<{ meetingCode
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-white flex flex-col items-center justify-center p-4 transition-colors">
       <div className="max-w-md w-full bg-white dark:bg-neutral-900/50 backdrop-blur-xl border border-zinc-200 dark:border-white/10 rounded-3xl p-8 shadow-2xl text-center relative">
-        <button onClick={handleCancel} className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-500/10"><X className="w-5 h-5" /></button>
+        
+        {/* Cancel Button */}
+        <button onClick={handleCancel} className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-500/10">
+            <X className="w-5 h-5" />
+        </button>
 
+        {/* Editable Title */}
         {isRenaming ? (
             <div className="flex items-center gap-2 mb-2 justify-center">
-                <input autoFocus className="bg-zinc-100 dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-lg px-3 py-1 text-xl font-bold text-center outline-none focus:border-indigo-500 w-3/4" value={title} onChange={(e) => setTitle(e.target.value)} />
+                <input 
+                    autoFocus
+                    className="bg-zinc-100 dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-lg px-3 py-1 text-xl font-bold text-center outline-none focus:border-indigo-500 w-3/4"
+                    value={title} onChange={(e) => setTitle(e.target.value)}
+                />
                 <Button size="sm" onClick={handleRename} className="bg-indigo-600 h-9">Save</Button>
             </div>
         ) : (
@@ -146,6 +154,7 @@ export default function MeetingLobby({ params }: { params: Promise<{ meetingCode
             </Button>
         </div>
 
+        {/* SCHEDULING POPUP */}
         <AnimatePresence>
             {isScheduling && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
