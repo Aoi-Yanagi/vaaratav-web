@@ -21,12 +21,13 @@ export async function GET(request: Request) {
 
     if (!user || !meeting) return NextResponse.json({ error: "Invalid meeting" }, { status: 404 });
 
-    const isHost = String(meeting.hostId) === String(user.id);
+   const isHost = String(meeting.hostId) === String(user.id);
     const safeName = user.name || (user.email ? user.email.split("@")[0] : "Guest User");
 
     const at = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
       identity: user.id, 
       name: safeName,
+      metadata: JSON.stringify({ isHost: isHost }),
     });
 
     at.addGrant({

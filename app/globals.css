@@ -69,18 +69,6 @@
   display: none !important;
 }
 
-/* 1. UNIVERSAL CAMERA MIRRORING */
-/* Mirror ALL camera feeds (both yours and remote participants) */
-.lk-participant-tile[data-lk-source="camera"] video {
-  transform: scaleX(-1) !important;
-}
-
-/* 2. STRICTLY PROTECT SCREEN SHARES */
-/* Never mirror a screen share, regardless of who is sharing it */
-.lk-participant-tile[data-lk-source="screen_share"] video {
-  transform: scaleX(1) !important;
-}
-
 /* --------------------------------------------------------
    LIVEKIT & NEXT.JS STRICT HEIGHT FIX 
    Forces the browser to give LiveKit a hard boundary
@@ -111,4 +99,33 @@ body {
   width: 100% !important;
   display: flex !important;
   flex-direction: column !important;
+}
+.lk-control-bar {
+  display: none !important;
+}
+
+/* 👉 FIX: Force the grid layout to fill the screen */
+.lk-grid-layout {
+  min-height: 0 !important;
+  height: 100dvh !important; 
+  width: 100% !important;
+  padding-bottom: 120px !important; /* Space for your floating control bar */
+}
+
+/* 👉 FIX: Ensure individual video tiles expand */
+.lk-participant-tile {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* 1. UNIVERSAL CAMERA MIRRORING */
+.lk-participant-tile[data-lk-source="camera"] video {
+  transform: scaleX(-1) !important;
+  object-fit: cover !important; 
+}
+
+/* 2. STRICTLY PROTECT SCREEN SHARES */
+.lk-participant-tile[data-lk-source="screen_share"] video {
+  transform: scaleX(1) !important;
+  object-fit: contain !important;
 }

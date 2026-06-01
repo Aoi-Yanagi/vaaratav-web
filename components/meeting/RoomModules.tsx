@@ -203,7 +203,10 @@ export function FloatingControlBar({
         } else {
           if (processorRef.current) await track.stopProcessor();
         }
-      } catch (e) { console.error("Failed to toggle background blur", e); }
+      // 痩 FIX: Removed the `(e)` parameter
+      } catch { 
+        console.error("Failed to toggle background blur"); 
+      }
     };
     applyBlur();
   }, [blurEnabled, cameraTrack]);
@@ -329,8 +332,9 @@ export function ReactionEngine({ onReaction, visible }: ReactionEngineProps) {
     if (localParticipant) {
         try {
             await localParticipant.publishData(payload, { reliable: true, topic: "reactions" });
-        } catch (error) {
-            console.error("Failed to broadcast reaction:", error);
+        // 痩 FIX: Removed the `(error)` parameter
+        } catch {
+            console.error("Failed to broadcast reaction");
         }
     }
     

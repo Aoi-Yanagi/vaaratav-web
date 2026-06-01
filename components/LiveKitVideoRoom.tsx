@@ -55,14 +55,11 @@ export function LiveKitVideoRoom({ roomCode, token, isHost }: LiveKitVideoRoomPr
   return (
     <LiveKitRoom
       video={true} 
-      audio={true} 
-      connect={true}
+      audio={true}
       token={token}
       serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
-      options={{ adaptiveStream: true, dynacast: true }}
       data-lk-theme="default"
-      // 🚨 Top Level bounding constraint
-      className="relative w-full h-[100dvh] overflow-hidden bg-zinc-50 dark:bg-zinc-950 transition-colors duration-500"
+      className="h-full w-full"
     >
       <RoomUI roomCode={roomCode} initialIsHost={isHost} />
     </LiveKitRoom>
@@ -87,11 +84,10 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
   // States
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [showMobileControls, setShowMobileControls] = useState(true);
-  const [captionsEnabled, setCaptionsEnabled] = useState(false);
+  const [captionsEnabled] = useState(false);
   const transcriptVault = useRef<{ speaker: string, text: string }[]>([]);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryResult, setSummaryResult] = useState<string | null>(null);
-  const [blurEnabled, setBlurEnabled] = useState(false);
 
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "people">("chat");
@@ -100,14 +96,23 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // 痩 RESTORED: These are required by RoomModules.tsx
   const [moderators, setModerators] = useState<Set<string>>(new Set());
   const [endReason, setEndReason] = useState<"ended" | "kicked" | "banned" | null>(null);
   const [showEndModal, setShowEndModal] = useState(false);
-  const [expandedParticipant, setExpandedParticipant] = useState<string | null>(null); 
 
-  const isActualHost: boolean = initialIsHost === true || checkIsHost(localParticipant.permissions) === true;
+  const isActualHost: boolean = initialIsHost === true || checkIsHost(localParticipant) === true;
   const isModerator = moderators.has(localParticipant.identity);
-  const isHostPresent = isActualHost || participants.some(p => checkIsHost(p.permissions) === true);
+  
+  const isHostPresent = participants.some((p) => {
+    try {
+      if (!p.metadata) return false;
+      const meta = JSON.parse(p.metadata);
+      return meta.isHost === true;
+    } catch {
+      return false;
+    }
+  });
 
   // --- DATA CHANNEL LISTENER ---
   useEffect(() => {
@@ -217,8 +222,11 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
         const data = await response.json();
         if (data.summary) setSummaryResult(data.summary);
         else alert("Error: " + data.error);
-    } catch (error) { console.error("Failed to fetch summary:", error); } 
-    finally { setIsSummarizing(false); }
+    } catch (error) { 
+        console.error("Failed to fetch summary:", error); 
+    } finally { 
+        setIsSummarizing(false); 
+    }
   };
 
   const handleLeaveClick = () => {
@@ -236,7 +244,9 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
     
     try {
       await fetch('/api/meetings/end', { method: 'POST', body: JSON.stringify({ meetingCode: roomCode }) });
-    } catch (e) { console.error(e) }
+    } catch { 
+      console.error("Failed to end meeting on the server."); 
+    }
   };
 
   // --- LIFECYCLE SCREENS ---
@@ -269,7 +279,9 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
         <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6" />
         <h2 className="text-2xl font-bold mb-2">Waiting for the Host...</h2>
         <p className="text-zinc-500 dark:text-zinc-400 mb-8">The meeting will begin once the host arrives.</p>
-        <Button onClick={() => router.push('/dashboard')} variant="outline" className="rounded-full px-8 h-12 border-zinc-200 dark:border-zinc-800">Cancel & Leave</Button>
+        <Button onClick={() => router.push('/dashboard')} variant="outline" className="rounded-full px-8 h-12 border-zinc-200 dark:border-zinc-800">
+          Cancel & Leave
+        </Button>
       </div>
     );
   }
@@ -280,6 +292,7 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
   else if (typingArray.length > 1) typingString = `${typingArray[0]} and ${typingArray.length - 1} others are typing...`;
 
   return (
+    // 痩 RESTORED: Exact match to RoomModules.tsx Context requirements
     <RoomAdminContext.Provider value={{ isHost: isActualHost, isModerator, moderators, executeCommand }}>
       <div className="w-full h-full text-zinc-900 dark:text-zinc-100 font-sans relative z-10">
           
@@ -305,13 +318,10 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
             </AnimatePresence>
         </div>
 
-        {/* 🚨 THE EXPERT FIX: Absolute DOM Boxing 🚨 */}
-        {/* This completely bypasses flex-height issues, forcing a strict drawing box for LiveKit math. */}
         <div className="absolute inset-x-4 top-4 bottom-[110px] sm:inset-x-8 sm:top-6 sm:bottom-[110px] mx-auto max-w-7xl z-10 flex flex-col">
           <div className="w-full h-full bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm rounded-[2rem] border border-zinc-200 dark:border-white/10 shadow-xl dark:shadow-2xl p-2 sm:p-4 flex flex-col">
              
              <div className="flex-1 w-full relative bg-black rounded-[1.5rem] overflow-hidden shadow-inner">
-                {/* The final absolute inset gives LiveKit a guaranteed mathematical boundary */}
                 <div className="absolute inset-0">
                    <GridLayout tracks={tracks} style={{ width: '100%', height: '100%' }}>
                      <ParticipantTile>
@@ -323,6 +333,8 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
              </div>
 
              <CaptionsOverlay enabled={captionsEnabled} />
+             
+             {/* 痩 RESTORED: Pass the ref directly, as expected by RoomModules.tsx */}
              <TranscriptAccumulator vaultRef={transcriptVault} />
           </div>
         </div>
@@ -428,18 +440,13 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
         {/* Modular Systems */}
         <ReactionEngine onReaction={addReactionToScreen} visible={showMobileControls} />
         
-        <FloatingControlBar 
-            visible={showMobileControls} 
-            isGuest={false} 
-            captionsEnabled={captionsEnabled}
-            onToggleCaptions={() => setCaptionsEnabled(!captionsEnabled)}
-            onGenerateSummary={handleGenerateSummary}
-            isSummarizing={isSummarizing}
-            blurEnabled={blurEnabled}
-            onToggleBlur={() => setBlurEnabled(!blurEnabled)}
-            onToggleChat={() => setSidebarOpen(!isSidebarOpen)}
-            isChatOpen={isSidebarOpen}
-            onLeave={handleLeaveClick}
+       <FloatingControlBar 
+          visible={showMobileControls} 
+          onGenerateSummary={handleGenerateSummary}
+          isSummarizing={isSummarizing}
+          onToggleChat={() => setSidebarOpen(!isSidebarOpen)}
+          isChatOpen={isSidebarOpen}
+          onLeave={handleLeaveClick}
         />
       </div>
     </RoomAdminContext.Provider>
