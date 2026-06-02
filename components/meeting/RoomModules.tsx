@@ -17,14 +17,20 @@ import Lottie from "lottie-react";
 import { BackgroundProcessor } from '@livekit/track-processors';
 
 // Lottie Assets
-import heartAnim from "../../app/public/lottie/heart.json";
-import fireAnim from "../../app/public/lottie/fire.json";
-import partyAnim from "../../app/public/lottie/party.json";
+import heartAnim from "../../app/public/lottie/love.json";
+import happyAnim from "../../app/public/lottie/happy.json";
+import likeAnim from "../../app/public/lottie/like.json";
+import handRaiseAnim from "../../app/public/lottie/hand-raise.json";
+import sadAnim from "../../app/public/lottie/sad.json";
+import thinkingAnim from "../../app/public/lottie/thinking.json";
 
 export const REACTION_MAP: Record<string, object> = {
   "heart": heartAnim,
-  "fire": fireAnim,
-  "party": partyAnim,
+  "like": likeAnim,
+  "thinking": thinkingAnim,
+  "happy": happyAnim,
+  "sad": sadAnim,
+  "hand_raise": handRaiseAnim,
 };
 
 // --- SHARED TYPES & CONTEXT ---
