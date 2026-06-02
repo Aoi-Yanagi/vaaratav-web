@@ -7,7 +7,7 @@ import {
   useLocalParticipant, 
   useDataChannel 
 } from "@livekit/components-react";
-import { RoomEvent, TranscriptionSegment, Participant, LocalVideoTrack } from "livekit-client";
+import { RoomEvent, TranscriptionSegment, Participant, LocalVideoTrack, ConnectionState } from "livekit-client"; // 👈 Added ConnectionState
 import { 
   Loader2, Mic, MicOff, Video as VideoIcon, VideoOff, MonitorUp, PhoneOff, 
   Sparkles, MessageSquare, MoreVertical, Ban, LogOut, ShieldMinus, ShieldAlert 
@@ -34,7 +34,6 @@ export interface CommandPayload {
   modList?: string[]; 
 }
 
-// 痩 FIX: Replaced 'any' with 'unknown' and safely cast the shape
 export const checkIsHost = (participantOrPermissions: unknown): boolean => {
   const p = participantOrPermissions as { permissions?: { roomAdmin?: boolean }, roomAdmin?: boolean };
   const perms = p?.permissions || p;
@@ -113,7 +112,6 @@ export function CaptionsOverlay({ enabled }: { enabled: boolean }) {
   const room = useRoomContext();
   const [captionText, setCaptionText] = useState("Waiting for speech...");
   
-  // 痩 FIX: Added 'null' to the generic and 'null' as the initial argument
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -221,7 +219,7 @@ export function FloatingControlBar({
         } else {
           if (processorRef.current) await track.stopProcessor();
         }
-      } catch { console.error("Failed to toggle background blur"); }
+      } catch { console.warn("Failed to toggle background blur"); }
     };
     applyBlur();
   }, [blurEnabled, cameraTrack]);
@@ -331,6 +329,7 @@ interface ReactionEngineProps {
 
 export function ReactionEngine({ onReaction, visible }: ReactionEngineProps) {
   const { localParticipant } = useLocalParticipant();
+  const room = useRoomContext();
   
   useDataChannel("reactions", (msg) => {
     const data = JSON.parse(new TextDecoder().decode(msg.payload));
@@ -344,11 +343,13 @@ export function ReactionEngine({ onReaction, visible }: ReactionEngineProps) {
     const senderName = localParticipant?.name || "Guest";
     const payload = new TextEncoder().encode(JSON.stringify({ type: "REACTION", reactionId, senderName, id }));
     
-    if (localParticipant) {
+    // 痩 FIX: Check connection status before trying to push reaction via DataChannel
+    if (localParticipant && room.state === ConnectionState.Connected) {
         try {
             await localParticipant.publishData(payload, { reliable: true, topic: "reactions" });
         } catch {
-            console.error("Failed to broadcast reaction");
+            // Demoted from error to warn so it fails silently rather than triggering the Next.js death screen
+            console.warn("Failed to broadcast reaction");
         }
     }
     
