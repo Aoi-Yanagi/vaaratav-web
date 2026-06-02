@@ -9,7 +9,7 @@ import { LiveKitRoom, VideoConference, RoomAudioRenderer } from "@livekit/compon
 import "@livekit/components-styles";
 import Lottie from "lottie-react";
 
-import { FloatingControlBar, ReactionEngine, REACTION_MAP } from "@/components/LiveKitVideoRoom";
+import { FloatingControlBar, ReactionEngine, REACTION_MAP } from "@/components/meeting/RoomModules";
 
 type Reaction = { id: string; reactionId: string; name: string; startX: number; endX: number };
 
@@ -174,7 +174,9 @@ export default function GuestChat({ params }: { params: Promise<{ roomId: string
         </div>
 
         <ReactionEngine onReaction={addReactionToScreen} visible={showMobileControls} />
-        <FloatingControlBar visible={showMobileControls} isGuest={true} />
+        
+        {/* 痩 FIX: Passed required 'onLeave' prop handler to completely satisfy types */}
+        <FloatingControlBar visible={showMobileControls} isGuest={true} onLeave={endSession} />
       </motion.div>
     </LiveKitRoom>
   );
