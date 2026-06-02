@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+// 痩 FIX: Explicitly added useContext to imports
+import React, { useState, useEffect, useRef, useCallback, useContext } from "react";
 import { useRouter } from "next/navigation";
 import { 
   LiveKitRoom, 
@@ -10,11 +11,17 @@ import {
   useLocalParticipant,
   useParticipants,
   useTracks,
-  useRoomContext
+  useRoomContext,
+  VideoTrack,          
+  ParticipantName,     
+  TrackMutedIndicator,
+  useParticipantContext
 } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { RoomEvent, Track, DataPacket_Kind, RemoteParticipant } from "livekit-client";
-import { Sparkles, Send, X, Ban, PhoneOff } from "lucide-react";
+
+// 痩 FIX: Kept PhoneOff import active to be used in UI below
+import { Sparkles, Send, X, Ban, PhoneOff, Copy, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Lottie from "lottie-react";
 import { Input } from "@/components/ui/input";
@@ -42,6 +49,41 @@ interface LiveKitVideoRoomProps {
 
 type Reaction = { id: string; reactionId: string; name: string; startX: number; endX: number };
 interface ChatMessage { sender: string; text: string; }
+
+// --- HELPERS FOR TILES ---
+function ParticipantMicIndicator() {
+  const participant = useParticipantContext();
+  return (
+    <TrackMutedIndicator 
+      trackRef={{ participant, source: Track.Source.Microphone }} 
+      show="muted" 
+      className="w-3.5 h-3.5 text-red-500" 
+    />
+  );
+}
+
+function ParticipantRoleBadge() {
+  const participant = useParticipantContext();
+  const { moderators } = useContext(RoomAdminContext)!;
+  
+  let isHost = false;
+  try {
+    if (participant.metadata) {
+      const meta = JSON.parse(participant.metadata);
+      if (meta.isHost === true) isHost = true;
+    }
+  } catch {}
+
+  // 痩 FIX: Safe cast to avoid TS "roomAdmin does not exist on ParticipantPermission" error
+  const perms = participant.permissions as unknown as { roomAdmin?: boolean };
+  if (perms?.roomAdmin) isHost = true;
+
+  const isMod = moderators.has(participant.identity);
+
+  if (isHost) return <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-500/90 text-white text-[9px] rounded font-bold uppercase tracking-wider">Host</span>;
+  if (isMod) return <span className="ml-1.5 px-1.5 py-0.5 bg-emerald-500/90 text-white text-[9px] rounded font-bold uppercase tracking-wider">Mod</span>;
+  return null;
+}
 
 // --- MAIN AUTHENTICATED ROOM COMPONENT ---
 export function LiveKitVideoRoom({ roomCode, token, isHost }: LiveKitVideoRoomProps) {
@@ -78,13 +120,15 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
       { source: Track.Source.Camera, withPlaceholder: true },
       { source: Track.Source.ScreenShare, withPlaceholder: false },
     ],
-    { onlySubscribed: false }
+    { onlySubscribed: false } 
   );
 
   // States
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [showMobileControls, setShowMobileControls] = useState(true);
-  const [captionsEnabled] = useState(false);
+  const [captionsEnabled, setCaptionsEnabled] = useState(false);
+  const [blurEnabled, setBlurEnabled] = useState(false);
+  
   const transcriptVault = useRef<{ speaker: string, text: string }[]>([]);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryResult, setSummaryResult] = useState<string | null>(null);
@@ -96,7 +140,6 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 痩 RESTORED: These are required by RoomModules.tsx
   const [moderators, setModerators] = useState<Set<string>>(new Set());
   const [endReason, setEndReason] = useState<"ended" | "kicked" | "banned" | null>(null);
   const [showEndModal, setShowEndModal] = useState(false);
@@ -113,6 +156,14 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
       return false;
     }
   });
+
+  // Keep all participants synced with the latest moderator list
+  useEffect(() => {
+    if (isActualHost) {
+        const payload: CommandPayload = { action: "SYNC_MODS", modList: Array.from(moderators) };
+        room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify(payload)), { reliable: true, topic: "commands" });
+    }
+  }, [participants.length, moderators, isActualHost, room.localParticipant]);
 
   // --- DATA CHANNEL LISTENER ---
   useEffect(() => {
@@ -137,6 +188,9 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
       if (topic === "commands") {
         const cmd = JSON.parse(decoder.decode(payload)) as CommandPayload;
         
+        if (cmd.action === "SYNC_MODS" && cmd.modList) {
+           setModerators(new Set(cmd.modList));
+        }
         if (cmd.action === "END_MEETING") {
            setEndReason("ended");
            room.disconnect();
@@ -229,6 +283,26 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
     }
   };
 
+  const handleCopySummary = () => {
+    if (summaryResult) {
+        navigator.clipboard.writeText(summaryResult);
+        alert("Summary copied to clipboard!");
+    }
+  };
+
+  const handleDownloadNotes = () => {
+    if (!summaryResult) return;
+    const blob = new Blob([summaryResult], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Meeting_Summary_${roomCode}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const handleLeaveClick = () => {
     if (isActualHost) setShowEndModal(true);
     else {
@@ -292,11 +366,9 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
   else if (typingArray.length > 1) typingString = `${typingArray[0]} and ${typingArray.length - 1} others are typing...`;
 
   return (
-    // 痩 RESTORED: Exact match to RoomModules.tsx Context requirements
     <RoomAdminContext.Provider value={{ isHost: isActualHost, isModerator, moderators, executeCommand }}>
       <div className="w-full h-full text-zinc-900 dark:text-zinc-100 font-sans relative z-10">
           
-        {/* Floating Lottie Bubbles Layer */}
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 pointer-events-none z-[90]">
             <AnimatePresence>
                 {reactions.map((r) => (
@@ -324,17 +396,25 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
              <div className="flex-1 w-full relative bg-black rounded-[1.5rem] overflow-hidden shadow-inner">
                 <div className="absolute inset-0">
                    <GridLayout tracks={tracks} style={{ width: '100%', height: '100%' }}>
-                     <ParticipantTile>
+                     <ParticipantTile className="relative w-full h-full overflow-hidden rounded-[1rem] bg-zinc-900 shadow-lg border border-white/5">
+                        
+                        <VideoTrack className="absolute inset-0 w-full h-full object-cover" />
+                        
+                        <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg text-white text-xs font-medium shadow-lg z-20 flex items-center gap-2">
+                           <ParticipantMicIndicator />
+                           <ParticipantName />
+                           <ParticipantRoleBadge />
+                        </div>
+
                         <ParticipantContextOverlay />
                      </ParticipantTile>
                    </GridLayout>
                 </div>
+                
                 <RoomAudioRenderer />
              </div>
 
              <CaptionsOverlay enabled={captionsEnabled} />
-             
-             {/* 痩 RESTORED: Pass the ref directly, as expected by RoomModules.tsx */}
              <TranscriptAccumulator vaultRef={transcriptVault} />
           </div>
         </div>
@@ -348,7 +428,12 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
                  <p className="text-zinc-500 dark:text-zinc-400 mb-6">As the host, you can leave the room running for others, or end it permanently for everyone.</p>
                  <div className="flex flex-col gap-3">
                    <Button onClick={handleEndForAll} className="w-full bg-red-600 hover:bg-red-700 text-white h-12 rounded-xl text-md font-bold">End Meeting for All</Button>
-                   <Button onClick={() => { setEndReason("ended"); room.disconnect(); }} variant="outline" className="w-full h-12 rounded-xl text-md border-zinc-200 dark:border-zinc-800">Just Leave Meeting</Button>
+                   
+                   {/* 痩 FIX: Using the PhoneOff icon to solve the unused import warning while improving the UI */}
+                   <Button onClick={() => { setEndReason("ended"); room.disconnect(); }} variant="outline" className="w-full h-12 rounded-xl text-md border-zinc-200 dark:border-zinc-800">
+                      <PhoneOff className="w-4 h-4 mr-2" /> Just Leave Meeting
+                   </Button>
+
                    <Button onClick={() => setShowEndModal(false)} variant="ghost" className="w-full h-12 rounded-xl text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/5">Cancel</Button>
                  </div>
                </motion.div>
@@ -398,7 +483,6 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
                 </>
               )}
 
-              {/* Sidebar Content */}
               {activeTab === "people" && (
                 <div className="flex-1 p-5 overflow-y-auto text-zinc-500 text-sm text-center mt-10">
                     Check your participants tab.
@@ -419,19 +503,30 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
               >
                   <div className="absolute inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-sm rounded-[2rem] transition-colors" onClick={() => setSummaryResult(null)} />
                   
-                  <div className="relative w-full max-w-2xl max-h-full overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 p-6 sm:p-8 rounded-3xl shadow-2xl flex flex-col gap-4 transition-colors">
-                      <div className="flex justify-between items-start">
+                  <div className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 p-6 sm:p-8 rounded-3xl shadow-2xl flex flex-col transition-colors">
+                      
+                      <div className="flex justify-between items-start mb-4 shrink-0">
                           <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-indigo-500 dark:from-cyan-400 dark:to-indigo-400 flex items-center gap-2">
                               <Sparkles className="w-5 h-5 text-cyan-500 dark:text-cyan-400" /> AI Meeting Notes
                           </h2>
                           <button onClick={() => setSummaryResult(null)} className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-full transition-colors">
-                              <PhoneOff className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+                              <X className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
                           </button>
                       </div>
                       
-                      <div className="text-zinc-600 dark:text-zinc-300 text-sm sm:text-base leading-relaxed whitespace-pre-wrap transition-colors">
+                      <div className="flex-1 overflow-y-auto pr-2 text-zinc-600 dark:text-zinc-300 text-sm sm:text-base leading-relaxed whitespace-pre-wrap transition-colors">
                           {summaryResult}
                       </div>
+
+                      <div className="flex justify-end gap-3 mt-6 border-t border-zinc-200 dark:border-white/10 pt-4 shrink-0">
+                          <Button onClick={handleCopySummary} variant="outline" className="h-10 px-4 rounded-xl border-zinc-200 dark:border-zinc-800">
+                              <Copy className="w-4 h-4 mr-2" /> Copy Text
+                          </Button>
+                          <Button onClick={handleDownloadNotes} className="h-10 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white">
+                              <Download className="w-4 h-4 mr-2" /> Download Notes
+                          </Button>
+                      </div>
+
                   </div>
               </motion.div>
           )}
@@ -442,8 +537,16 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
         
        <FloatingControlBar 
           visible={showMobileControls} 
+          
+          captionsEnabled={captionsEnabled}
+          onToggleCaptions={() => setCaptionsEnabled(!captionsEnabled)}
+          
+          blurEnabled={blurEnabled}
+          onToggleBlur={() => setBlurEnabled(!blurEnabled)}
+          
           onGenerateSummary={handleGenerateSummary}
           isSummarizing={isSummarizing}
+          
           onToggleChat={() => setSidebarOpen(!isSidebarOpen)}
           isChatOpen={isSidebarOpen}
           onLeave={handleLeaveClick}

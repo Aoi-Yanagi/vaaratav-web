@@ -29,12 +29,16 @@ export const REACTION_MAP: Record<string, object> = {
 
 // --- SHARED TYPES & CONTEXT ---
 export interface CommandPayload { 
-  action: "KICK" | "BAN" | "MUTE" | "GRANT_MOD" | "REVOKE_MOD" | "END_MEETING"; 
+  action: "KICK" | "BAN" | "MUTE" | "GRANT_MOD" | "REVOKE_MOD" | "END_MEETING" | "SYNC_MODS"; 
   targetIdentity?: string; 
+  modList?: string[]; 
 }
 
-export const checkIsHost = (permissions: unknown): boolean => {
-  return (permissions as { roomAdmin?: boolean })?.roomAdmin === true;
+// 痩 FIX: Replaced 'any' with 'unknown' and safely cast the shape
+export const checkIsHost = (participantOrPermissions: unknown): boolean => {
+  const p = participantOrPermissions as { permissions?: { roomAdmin?: boolean }, roomAdmin?: boolean };
+  const perms = p?.permissions || p;
+  return perms?.roomAdmin === true;
 };
 
 export const RoomAdminContext = createContext<{
@@ -54,7 +58,7 @@ export function ParticipantContextOverlay() {
   if (!context) return null;
   const { isHost, isModerator, moderators, executeCommand } = context;
 
-  const pIsHost = checkIsHost(p.permissions) === true;
+  const pIsHost = checkIsHost(p) === true;
   const pIsMod = moderators.has(p.identity);
   
   const hasAuthority = !p.isLocal && (isHost || (isModerator && !pIsMod && !pIsHost));
@@ -108,27 +112,35 @@ export function ParticipantContextOverlay() {
 export function CaptionsOverlay({ enabled }: { enabled: boolean }) {
   const room = useRoomContext();
   const [captionText, setCaptionText] = useState("Waiting for speech...");
+  
+  // 痩 FIX: Added 'null' to the generic and 'null' as the initial argument
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!room || !enabled) return;
+    
     const handleTranscription = (segments: TranscriptionSegment[], participant?: Participant) => {
       if (!participant) return;
-      const fullPhrase = segments.map((s) => s.text).join(" ");
-      if (fullPhrase.trim().length > 0) {
+      
+      const fullPhrase = segments.map((s) => s.text).join(" ").trim();
+      
+      if (fullPhrase.length > 0) {
         const identity = participant.name || participant.identity;
         setCaptionText(`${identity}: "${fullPhrase}"`);
+        
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => {
+            setCaptionText("Waiting for speech...");
+        }, 4000);
       }
     };
+    
     room.on(RoomEvent.TranscriptionReceived, handleTranscription);
-    return () => { room.off(RoomEvent.TranscriptionReceived, handleTranscription); };
+    return () => { 
+        room.off(RoomEvent.TranscriptionReceived, handleTranscription); 
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
   }, [room, enabled]);
-
- useEffect(() => {
-    if (enabled) {
-      const timer = setTimeout(() => setCaptionText("Waiting for speech..."), 0);
-      return () => clearTimeout(timer);
-    }
-  }, [enabled]);
 
   return (
     <AnimatePresence>
@@ -151,14 +163,20 @@ export function CaptionsOverlay({ enabled }: { enabled: boolean }) {
 // --- 3. BACKGROUND TRANSCRIPT VAULT ---
 export function TranscriptAccumulator({ vaultRef }: { vaultRef: React.MutableRefObject<{ speaker: string, text: string }[]> }) {
   const room = useRoomContext();
+  
   useEffect(() => {
     if (!room) return;
     const handleTranscription = (segments: TranscriptionSegment[], participant?: Participant) => {
       if (!participant) return;
-      const fullPhrase = segments.map((s) => s.text).join(" ");
-      if (fullPhrase.trim().length > 0) {
-        const identity = participant.name || participant.identity;
-        vaultRef.current.push({ speaker: identity, text: fullPhrase });
+      
+      const finalSegments = segments.filter(s => s.final);
+      
+      for (const seg of finalSegments) {
+          const text = seg.text.trim();
+          if (text.length > 0) {
+              const identity = participant.name || participant.identity;
+              vaultRef.current.push({ speaker: identity, text });
+          }
       }
     };
     room.on(RoomEvent.TranscriptionReceived, handleTranscription);
@@ -203,10 +221,7 @@ export function FloatingControlBar({
         } else {
           if (processorRef.current) await track.stopProcessor();
         }
-      // 痩 FIX: Removed the `(e)` parameter
-      } catch { 
-        console.error("Failed to toggle background blur"); 
-      }
+      } catch { console.error("Failed to toggle background blur"); }
     };
     applyBlur();
   }, [blurEnabled, cameraTrack]);
@@ -332,7 +347,6 @@ export function ReactionEngine({ onReaction, visible }: ReactionEngineProps) {
     if (localParticipant) {
         try {
             await localParticipant.publishData(payload, { reliable: true, topic: "reactions" });
-        // 痩 FIX: Removed the `(error)` parameter
         } catch {
             console.error("Failed to broadcast reaction");
         }
