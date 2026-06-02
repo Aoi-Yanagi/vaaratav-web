@@ -27,6 +27,8 @@ import Lottie from "lottie-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Participant } from "livekit-client";
+
 
 // --- IMPORTING THE OPTIMIZED MODULES ---
 import { 
@@ -114,7 +116,30 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
   const router = useRouter();
   const { localParticipant } = useLocalParticipant();
   const participants = useParticipants();
+  const allParticipants = [localParticipant, ...participants];
   
+  const getParticipantRole = (p: Participant) => {
+    if (p.identity === localParticipant.identity) {
+      if (isActualHost) return "Host";
+      if (isModerator) return "Mod";
+      return "Participant";
+    }
+    let isH = false;
+    try { 
+      if (p.metadata) { 
+        const m = JSON.parse(p.metadata); 
+        if (m.isHost) isH = true; 
+      } 
+    } catch {}
+
+    // Safely type-cast to access the roomAdmin permission
+    const perms = p.permissions as unknown as { roomAdmin?: boolean };
+    if (perms?.roomAdmin) isH = true;
+
+    if (isH) return "Host";
+    if (moderators.has(p.identity)) return "Mod";
+    return "Participant";
+  };
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -141,7 +166,7 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const [moderators, setModerators] = useState<Set<string>>(new Set());
-  const [endReason, setEndReason] = useState<"ended" | "kicked" | "banned" | null>(null);
+  const [endReason, setEndReason] = useState<"ended" | "kicked" | "banned" | "host_ended" | "left" | null>(null);
   const [showEndModal, setShowEndModal] = useState(false);
 
   const isActualHost: boolean = initialIsHost === true || checkIsHost(localParticipant) === true;
@@ -192,7 +217,7 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
            setModerators(new Set(cmd.modList));
         }
         if (cmd.action === "END_MEETING") {
-           setEndReason("ended");
+           setEndReason("host_ended"); // 👈 Updated
            room.disconnect();
         }
         if (cmd.action === "GRANT_MOD" && cmd.targetIdentity) {
@@ -306,7 +331,7 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
   const handleLeaveClick = () => {
     if (isActualHost) setShowEndModal(true);
     else {
-      setEndReason("ended");
+      setEndReason("left"); // 👈 Updated
       room.disconnect();
     }
   };
@@ -328,17 +353,25 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
     return (
       <div className="flex flex-col items-center justify-center flex-1 h-[100dvh] w-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white p-6 z-50 absolute inset-0">
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 p-10 rounded-[2rem] shadow-2xl flex flex-col items-center text-center max-w-md w-full">
-           <div className={cn("w-20 h-20 rounded-full flex items-center justify-center mb-6", endReason === "ended" ? "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400" : "bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400")}>
-             {endReason === "ended" ? <Sparkles className="w-10 h-10" /> : <Ban className="w-10 h-10" />}
+           <div className={cn("w-20 h-20 rounded-full flex items-center justify-center mb-6", (endReason === "ended" || endReason === "left") ? "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400" : "bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400")}>
+             {(endReason === "ended" || endReason === "left") ? <Sparkles className="w-10 h-10" /> : <Ban className="w-10 h-10" />}
            </div>
+           
            <h1 className="text-3xl font-bold mb-3 tracking-tight">
-             {endReason === "kicked" ? "You were removed" : endReason === "banned" ? "You were banned" : "Meeting Ended"}
+             {endReason === "kicked" ? "You were removed" 
+              : endReason === "banned" ? "You were banned" 
+              : endReason === "host_ended" ? "Meeting has been ended by host" 
+              : endReason === "left" ? "You left the meeting"
+              : "Meeting Ended"}
            </h1>
+           
            <p className="text-zinc-500 dark:text-zinc-400 mb-8 leading-relaxed">
              {endReason === "kicked" ? "The host or a moderator has removed you from this session." 
              : endReason === "banned" ? "You have been permanently banned from joining this room code." 
+             : endReason === "host_ended" ? "The host has permanently concluded this video session for all participants."
              : "This video session has been concluded. Thank you for participating."}
            </p>
+           
            <Button onClick={() => router.push('/dashboard')} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 text-lg font-semibold shadow-lg">
              Return to Dashboard
            </Button>
@@ -353,9 +386,9 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
         <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6" />
         <h2 className="text-2xl font-bold mb-2">Waiting for the Host...</h2>
         <p className="text-zinc-500 dark:text-zinc-400 mb-8">The meeting will begin once the host arrives.</p>
-        <Button onClick={() => router.push('/dashboard')} variant="outline" className="rounded-full px-8 h-12 border-zinc-200 dark:border-zinc-800">
-          Cancel & Leave
-        </Button>
+        <Button onClick={() => { setEndReason("left"); room.disconnect(); }} variant="outline" className="w-full h-12 rounded-xl text-md border-zinc-200 dark:border-zinc-800">
+      <PhoneOff className="w-4 h-4 mr-2" /> Just Leave Meeting
+  </Button>
       </div>
     );
   }
@@ -484,8 +517,31 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
               )}
 
               {activeTab === "people" && (
-                <div className="flex-1 p-5 overflow-y-auto text-zinc-500 text-sm text-center mt-10">
-                    Check your participants tab.
+                <div className="flex-1 p-5 overflow-y-auto space-y-4">
+                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mb-2">
+                        In this meeting ({allParticipants.length})
+                    </h3>
+                    {allParticipants.map((p) => {
+                        const role = getParticipantRole(p);
+                        const isMe = p.identity === localParticipant.identity;
+                        return (
+                            <div key={p.identity} className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/10 transition-colors">
+                                <div className="w-10 h-10 shrink-0 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg">
+                                    {(p.name || "G")[0].toUpperCase()}
+                                </div>
+                                <div className="flex flex-col flex-1 overflow-hidden">
+                                    <span className="text-sm font-medium text-zinc-900 dark:text-white truncate">
+                                        {p.name || "Guest"} {isMe && <span className="text-zinc-400 font-normal">(You)</span>}
+                                    </span>
+                                    <span className="text-xs">
+                                        {role === "Host" && <span className="text-indigo-500 dark:text-indigo-400 font-bold uppercase tracking-wider">Host</span>}
+                                        {role === "Mod" && <span className="text-emerald-500 dark:text-emerald-400 font-bold uppercase tracking-wider">Moderator</span>}
+                                        {role === "Participant" && <span className="text-zinc-500 dark:text-zinc-400">Participant</span>}
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
               )}
             </motion.div>
