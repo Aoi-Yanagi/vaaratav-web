@@ -1,47 +1,66 @@
+import { NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { NextResponse } from "next/server";
 
-export async function GET(request: Request) {
+export const dynamic = "force-dynamic";
+
+export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 });
+    const { searchParams } = new URL(req.url);
+    const room = searchParams.get("room");
+    const guestUsername = searchParams.get("username");
+
+    if (!room) {
+      return NextResponse.json({ error: "Missing 'room' query parameter" }, { status: 400 });
     }
 
-    const { searchParams } = new URL(request.url);
-    const roomCode = searchParams.get("room");
-    if (!roomCode) return NextResponse.json({ error: "Missing room" }, { status: 400 });
+    // Safely check for a logged-in user
+    const session = await getServerSession(authOptions);
+    
+    let identity = "";
+    let isHost = false;
 
-    const user = await db.user.findUnique({ where: { email: session.user.email } });
-    const meeting = await db.meeting.findUnique({ where: { meetingCode: roomCode } });
+    // Logic: Authenticated Users = Hosts. Fallback to Guest Name.
+    if (session?.user) {
+        identity = session.user.name || session.user.email || "Host User";
+        isHost = true; 
+    } else if (guestUsername) {
+        identity = guestUsername;
+        isHost = false;
+    } else {
+        // If neither exists, they shouldn't be requesting a token
+        return NextResponse.json({ error: "Unauthorized. Please log in or provide a guest username." }, { status: 401 });
+    }
 
-    if (!user || !meeting) return NextResponse.json({ error: "Invalid meeting" }, { status: 404 });
+    const apiKey = process.env.LIVEKIT_API_KEY;
+    const apiSecret = process.env.LIVEKIT_API_SECRET;
 
-   const isHost = String(meeting.hostId) === String(user.id);
-    const safeName = user.name || (user.email ? user.email.split("@")[0] : "Guest User");
+    if (!apiKey || !apiSecret) {
+      return NextResponse.json({ error: "LiveKit credentials not configured" }, { status: 500 });
+    }
 
-    const at = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
-      identity: user.id, 
-      name: safeName,
-      metadata: JSON.stringify({ isHost: isHost }),
+    // Generate the token
+    const at = new AccessToken(apiKey, apiSecret, {
+      identity,
+      name: identity,
+      ttl: "10m", // Token expiration
     });
 
-    at.addGrant({
-      roomJoin: true,
-      room: roomCode,
-      canPublish: true,
-      canSubscribe: true,
-      roomAdmin: isHost, 
+    at.addGrant({ 
+        roomJoin: true, 
+        room, 
+        canPublish: true, 
+        canSubscribe: true,
+        canPublishData: true, // Required for Chat & Reactions
+        roomAdmin: isHost     // Only give host powers to logged in users
     });
 
-    // FIX: Send isHost directly to the frontend so it bypasses the waiting room!
-    return NextResponse.json({ token: await at.toJwt(), isHost });
+    const token = await at.toJwt();
+
+    return NextResponse.json({ token, isHost });
   } catch (error) {
     console.error("LiveKit Token Error:", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

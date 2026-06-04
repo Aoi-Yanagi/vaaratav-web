@@ -1,6 +1,5 @@
 "use client";
 
-// 痩 FIX: Explicitly added useContext to imports
 import React, { useState, useEffect, useRef, useCallback, useContext } from "react";
 import { useRouter } from "next/navigation";
 import { 
@@ -12,23 +11,27 @@ import {
   useParticipants,
   useTracks,
   useRoomContext,
-  VideoTrack,          
-  ParticipantName,     
+  useChat,
+  LayoutContextProvider,
+  useCreateLayoutContext,
+  usePinnedTracks,
+  VideoTrack,
+  ParticipantName,
   TrackMutedIndicator,
   useParticipantContext
 } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { RoomEvent, Track, DataPacket_Kind, RemoteParticipant } from "livekit-client";
 
-// 痩 FIX: Kept PhoneOff import active to be used in UI below
-import { Sparkles, Send, X, Ban, PhoneOff, Copy, Download } from "lucide-react";
+// Required Icons
+import { 
+  Sparkles, Ban, Copy, Download, PhoneOff 
+} from "lucide-react";
+
 import { motion, AnimatePresence } from "framer-motion";
 import Lottie from "lottie-react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Participant } from "livekit-client";
-
 
 // --- IMPORTING THE OPTIMIZED MODULES ---
 import { 
@@ -40,7 +43,10 @@ import {
   TranscriptAccumulator,
   FloatingControlBar,
   ReactionEngine,
-  REACTION_MAP
+  RoomSidebar,
+  MinimalChatMessage,
+  REACTION_MAP,
+  Reaction
 } from "./meeting/RoomModules";
 
 interface LiveKitVideoRoomProps {
@@ -48,9 +54,6 @@ interface LiveKitVideoRoomProps {
   token: string;
   isHost?: boolean;
 }
-
-type Reaction = { id: string; reactionId: string; name: string; startX: number; endX: number };
-interface ChatMessage { sender: string; text: string; }
 
 // --- HELPERS FOR TILES ---
 function ParticipantMicIndicator() {
@@ -66,24 +69,21 @@ function ParticipantMicIndicator() {
 
 function ParticipantRoleBadge() {
   const participant = useParticipantContext();
-  const { moderators } = useContext(RoomAdminContext)!;
+  const context = useContext(RoomAdminContext);
   
   let isHost = false;
-  try {
-    if (participant.metadata) {
-      const meta = JSON.parse(participant.metadata);
-      if (meta.isHost === true) isHost = true;
-    }
-  } catch {}
-
-  // 痩 FIX: Safe cast to avoid TS "roomAdmin does not exist on ParticipantPermission" error
+  
+  // 1. Check LiveKit native permissions safely without 'any'
   const perms = participant.permissions as unknown as { roomAdmin?: boolean };
   if (perms?.roomAdmin) isHost = true;
+  
+  // 2. Fallback: Force Host badge if they are the local host
+  if (participant.isLocal && context?.isHost) isHost = true;
 
-  const isMod = moderators.has(participant.identity);
+  const isMod = context?.moderators?.has(participant.identity);
 
-  if (isHost) return <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-500/90 text-white text-[9px] rounded font-bold uppercase tracking-wider">Host</span>;
-  if (isMod) return <span className="ml-1.5 px-1.5 py-0.5 bg-emerald-500/90 text-white text-[9px] rounded font-bold uppercase tracking-wider">Mod</span>;
+  if (isHost) return <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-500/90 text-white text-[10px] rounded font-bold uppercase tracking-wider shadow-sm">Host</span>;
+  if (isMod) return <span className="ml-1.5 px-1.5 py-0.5 bg-emerald-500/90 text-white text-[10px] rounded font-bold uppercase tracking-wider shadow-sm">Mod</span>;
   return null;
 }
 
@@ -99,11 +99,13 @@ export function LiveKitVideoRoom({ roomCode, token, isHost }: LiveKitVideoRoomPr
   return (
     <LiveKitRoom
       video={true} 
-      audio={true}
+      audio={true} 
+      connect={true}
       token={token}
       serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
+      options={{ adaptiveStream: true, dynacast: true }}
       data-lk-theme="default"
-      className="h-full w-full"
+      className="relative w-full h-[100dvh] overflow-hidden bg-zinc-50 dark:bg-zinc-950 transition-colors duration-500"
     >
       <RoomUI roomCode={roomCode} initialIsHost={isHost} />
     </LiveKitRoom>
@@ -116,90 +118,110 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
   const router = useRouter();
   const { localParticipant } = useLocalParticipant();
   const participants = useParticipants();
-  const allParticipants = [localParticipant, ...participants];
   
-  const getParticipantRole = (p: Participant) => {
-    if (p.identity === localParticipant.identity) {
-      if (isActualHost) return "Host";
-      if (isModerator) return "Mod";
-      return "Participant";
-    }
-    let isH = false;
-    try { 
-      if (p.metadata) { 
-        const m = JSON.parse(p.metadata); 
-        if (m.isHost) isH = true; 
-      } 
-    } catch {}
-
-    // Safely type-cast to access the roomAdmin permission
-    const perms = p.permissions as unknown as { roomAdmin?: boolean };
-    if (perms?.roomAdmin) isH = true;
-
-    if (isH) return "Host";
-    if (moderators.has(p.identity)) return "Mod";
-    return "Participant";
-  };
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
       { source: Track.Source.ScreenShare, withPlaceholder: false },
     ],
-    { onlySubscribed: false } 
+    { onlySubscribed: false }
   );
+
+  // Layout Context (Unlocks Native Pinning & Fullscreen)
+  const layoutContext = useCreateLayoutContext();
+  const pinnedTracks = usePinnedTracks(layoutContext);
+  const screenShareTracks = tracks.filter(t => t.source === Track.Source.ScreenShare);
+  const focusTrack = pinnedTracks.length > 0 ? pinnedTracks[0] : screenShareTracks.length > 0 ? screenShareTracks[0] : null;
 
   // States
   const [reactions, setReactions] = useState<Reaction[]>([]);
-  const [showMobileControls, setShowMobileControls] = useState(true);
   const [captionsEnabled, setCaptionsEnabled] = useState(false);
-  const [blurEnabled, setBlurEnabled] = useState(false);
-  
   const transcriptVault = useRef<{ speaker: string, text: string }[]>([]);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryResult, setSummaryResult] = useState<string | null>(null);
+  const [blurEnabled, setBlurEnabled] = useState(false);
 
+  // Communication States
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "people">("chat");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
-  const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Control Hiding Logic
+  const [isControlsVisible, setIsControlsVisible] = useState(true);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerControlVisibility = useCallback(() => {
+    setIsControlsVisible(true);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    
+    // Only set the hide-timer if the sidebar is closed
+    if (!isSidebarOpen) {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setIsControlsVisible(false);
+      }, 3000);
+    }
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    const initTimer = setTimeout(() => triggerControlVisibility(), 0);
+    
+    window.addEventListener('mousemove', triggerControlVisibility);
+    window.addEventListener('touchstart', triggerControlVisibility);
+    window.addEventListener('keydown', triggerControlVisibility);
+    window.addEventListener('click', triggerControlVisibility);
+    
+    return () => {
+      clearTimeout(initTimer);
+      window.removeEventListener('mousemove', triggerControlVisibility);
+      window.removeEventListener('touchstart', triggerControlVisibility);
+      window.removeEventListener('keydown', triggerControlVisibility);
+      window.removeEventListener('click', triggerControlVisibility);
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    };
+  }, [triggerControlVisibility]);
+
+  // Robust Chat via LiveKit Hook
+  const { send: sendChatMessage, chatMessages } = useChat();
+
+  const handleSendMessage = (msg: string) => {
+    if (sendChatMessage) sendChatMessage(msg);
+  };
+
+  // Ref-based sidebar opening
+  const previousMessagesLength = useRef(0);
+  useEffect(() => {
+    if (chatMessages.length > previousMessagesLength.current) {
+       const latestMessage = chatMessages[chatMessages.length - 1];
+       if (latestMessage.from?.identity !== localParticipant.identity && !isSidebarOpen) {
+          requestAnimationFrame(() => {
+            setSidebarOpen(true);
+            setActiveTab("chat");
+          });
+       }
+    }
+    previousMessagesLength.current = chatMessages.length;
+  }, [chatMessages, isSidebarOpen, localParticipant.identity]);
+
+  // Authority & Meeting Lifecycle States
   const [moderators, setModerators] = useState<Set<string>>(new Set());
-  const [endReason, setEndReason] = useState<"ended" | "kicked" | "banned" | "host_ended" | "left" | null>(null);
+  const [endReason, setEndReason] = useState<"ended" | "kicked" | "banned" | null>(null);
   const [showEndModal, setShowEndModal] = useState(false);
 
-  const isActualHost: boolean = initialIsHost === true || checkIsHost(localParticipant) === true;
+  const isActualHost: boolean = initialIsHost === true || checkIsHost(localParticipant.permissions) === true;
   const isModerator = moderators.has(localParticipant.identity);
-  
-  const isHostPresent = participants.some((p) => {
-    try {
-      if (!p.metadata) return false;
-      const meta = JSON.parse(p.metadata);
-      return meta.isHost === true;
-    } catch {
-      return false;
-    }
-  });
+  const isHostPresent = isActualHost || participants.some(p => checkIsHost(p.permissions) === true);
 
-  // Keep all participants synced with the latest moderator list
-  useEffect(() => {
-    if (isActualHost) {
-        const payload: CommandPayload = { action: "SYNC_MODS", modList: Array.from(moderators) };
-        room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify(payload)), { reliable: true, topic: "commands" });
-    }
-  }, [participants.length, moderators, isActualHost, room.localParticipant]);
+  // Aggressive deduplication and fallback logic for the People Sidebar
+  const uniqueParticipants = Array.from(new Map(participants.map(p => {
+      p.name = p.name || p.identity || "Unknown User";
+      return [p.identity, p];
+  })).values());
 
   // --- DATA CHANNEL LISTENER ---
   useEffect(() => {
     const handleData = (payload: Uint8Array, participant?: RemoteParticipant, kind?: DataPacket_Kind, topic?: string) => {
       const decoder = new TextDecoder();
-      
-      if (topic === "chat") {
-        const msg = JSON.parse(decoder.decode(payload)) as ChatMessage;
-        setMessages(prev => [...prev, msg]);
-        if (!isSidebarOpen) setSidebarOpen(true);
-      }
       
       if (topic === "typing") {
         const name = decoder.decode(payload);
@@ -213,61 +235,23 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
       if (topic === "commands") {
         const cmd = JSON.parse(decoder.decode(payload)) as CommandPayload;
         
-        if (cmd.action === "SYNC_MODS" && cmd.modList) {
-           setModerators(new Set(cmd.modList));
-        }
-        if (cmd.action === "END_MEETING") {
-           setEndReason("host_ended"); // 👈 Updated
-           room.disconnect();
-        }
-        if (cmd.action === "GRANT_MOD" && cmd.targetIdentity) {
-           setModerators(prev => new Set(prev).add(cmd.targetIdentity!));
-        }
-        if (cmd.action === "REVOKE_MOD" && cmd.targetIdentity) {
-           setModerators(prev => { const s = new Set(prev); s.delete(cmd.targetIdentity!); return s; });
-        }
+        if (cmd.action === "END_MEETING") { setEndReason("ended"); room.disconnect(); }
+        if (cmd.action === "GRANT_MOD" && cmd.targetIdentity) setModerators(prev => new Set(prev).add(cmd.targetIdentity!));
+        if (cmd.action === "REVOKE_MOD" && cmd.targetIdentity) setModerators(prev => { const s = new Set(prev); s.delete(cmd.targetIdentity!); return s; });
 
         if (cmd.targetIdentity === localParticipant.identity) {
           if (cmd.action === "MUTE") localParticipant.setMicrophoneEnabled(false);
-          if (cmd.action === "KICK") {
-            setEndReason("kicked");
-            room.disconnect();
-          }
-          if (cmd.action === "BAN") {
-            localStorage.setItem(`banned_${roomCode}`, "true"); 
-            setEndReason("banned");
-            room.disconnect();
-          }
+          if (cmd.action === "KICK") { setEndReason("kicked"); room.disconnect(); }
+          if (cmd.action === "BAN") { localStorage.setItem(`banned_${roomCode}`, "true"); setEndReason("banned"); room.disconnect(); }
         }
       }
     };
     room.on(RoomEvent.DataReceived, handleData);
     return () => { room.off(RoomEvent.DataReceived, handleData); };
-  }, [room, localParticipant, isSidebarOpen, roomCode]);
+  }, [room, localParticipant, roomCode]);
 
-  useEffect(() => scrollRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
 
-  useEffect(() => {
-    const handleScreenTap = (e: PointerEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName.toLowerCase() === 'video') return;
-      if (target.closest('#custom-control-bar') || target.closest('#reaction-engine') || target.closest('#sidebar-panel')) return;
-      if (window.innerWidth < 640) setShowMobileControls(prev => !prev);
-    };
-    window.addEventListener('pointerup', handleScreenTap);
-    return () => window.removeEventListener('pointerup', handleScreenTap);
-  }, []);
-
-  // --- ACTIONS ---
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-    const msg: ChatMessage = { sender: localParticipant.name || "User", text: chatInput };
-    room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify(msg)), { reliable: true, topic: "chat" });
-    setMessages(prev => [...prev, msg]);
-    setChatInput("");
-  };
-
+  // Actions
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
     setChatInput(e.target.value);
     room.localParticipant.publishData(new TextEncoder().encode(localParticipant.name || "User"), { reliable: false, topic: "typing" });
@@ -278,103 +262,68 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
     room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify(payload)), { reliable: true, topic: "commands" });
   };
 
-  const addReactionToScreen = useCallback((reactionData: {id: string, reactionId: string, name: string}) => {
-    const startX = Math.floor(Math.random() * 60) - 30;
-    const endX = startX + (Math.floor(Math.random() * 40) - 20);
-    setReactions(prev => [...prev, { ...reactionData, startX, endX }]);
-    setTimeout(() => setReactions(prev => prev.filter(r => r.id !== reactionData.id)), 3000);
+  // Pure programmatic pseudo-random for reaction tracking
+  const reactionCounter = useRef(0);
+  const handleAddReaction = useCallback((reactionData: { id: string; reactionId: string; name: string }) => {
+     reactionCounter.current += 1;
+     const startX = (reactionCounter.current % 60) - 30;
+     const endX = startX + ((reactionCounter.current % 40) - 20);
+     
+     setReactions(prev => [...prev, { ...reactionData, startX, endX }]);
+     setTimeout(() => setReactions(prev => prev.filter(r => r.id !== reactionData.id)), 3000);
   }, []);
 
   const handleGenerateSummary = async () => {
-    if (transcriptVault.current.length === 0) {
-        alert("No words have been spoken yet!");
-        return;
-    }
+    if (transcriptVault.current.length === 0) { alert("No words have been spoken yet!"); return; }
     setIsSummarizing(true);
     setSummaryResult(null);
     try {
-        const response = await fetch('/api/summary', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ transcript: transcriptVault.current }),
-        });
+        const response = await fetch('/api/summary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transcript: transcriptVault.current }) });
         const data = await response.json();
         if (data.summary) setSummaryResult(data.summary);
         else alert("Error: " + data.error);
-    } catch (error) { 
-        console.error("Failed to fetch summary:", error); 
-    } finally { 
-        setIsSummarizing(false); 
-    }
+    } catch (error) { console.error("Failed to fetch summary:", error); } 
+    finally { setIsSummarizing(false); }
   };
 
   const handleCopySummary = () => {
-    if (summaryResult) {
-        navigator.clipboard.writeText(summaryResult);
-        alert("Summary copied to clipboard!");
-    }
+      if (summaryResult) {
+          navigator.clipboard.writeText(summaryResult).catch(err => console.error("Copy failed", err));
+      }
   };
 
   const handleDownloadNotes = () => {
-    if (!summaryResult) return;
-    const blob = new Blob([summaryResult], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Meeting_Summary_${roomCode}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleLeaveClick = () => {
-    if (isActualHost) setShowEndModal(true);
-    else {
-      setEndReason("left"); // 👈 Updated
-      room.disconnect();
-    }
+      if (!summaryResult) return;
+      const blob = new Blob([summaryResult], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Meeting_Notes_${roomCode}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
   };
 
   const handleEndForAll = async () => {
     executeCommand("all", "END_MEETING");
     setEndReason("ended");
     room.disconnect();
-    
-    try {
-      await fetch('/api/meetings/end', { method: 'POST', body: JSON.stringify({ meetingCode: roomCode }) });
-    } catch { 
-      console.error("Failed to end meeting on the server."); 
-    }
+    try { await fetch('/api/meetings/end', { method: 'POST', body: JSON.stringify({ meetingCode: roomCode }) }); } catch (e) { console.error(e) }
   };
+
 
   // --- LIFECYCLE SCREENS ---
   if (endReason) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 h-[100dvh] w-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white p-6 z-50 absolute inset-0">
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 p-10 rounded-[2rem] shadow-2xl flex flex-col items-center text-center max-w-md w-full">
-           <div className={cn("w-20 h-20 rounded-full flex items-center justify-center mb-6", (endReason === "ended" || endReason === "left") ? "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400" : "bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400")}>
-             {(endReason === "ended" || endReason === "left") ? <Sparkles className="w-10 h-10" /> : <Ban className="w-10 h-10" />}
+           <div className={cn("w-20 h-20 rounded-full flex items-center justify-center mb-6", endReason === "ended" ? "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400" : "bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400")}>
+             {endReason === "ended" ? <Sparkles className="w-10 h-10" /> : <Ban className="w-10 h-10" />}
            </div>
-           
-           <h1 className="text-3xl font-bold mb-3 tracking-tight">
-             {endReason === "kicked" ? "You were removed" 
-              : endReason === "banned" ? "You were banned" 
-              : endReason === "host_ended" ? "Meeting has been ended by host" 
-              : endReason === "left" ? "You left the meeting"
-              : "Meeting Ended"}
-           </h1>
-           
+           <h1 className="text-3xl font-bold mb-3 tracking-tight">{endReason === "kicked" ? "You were removed" : endReason === "banned" ? "You were banned" : "Meeting Ended"}</h1>
            <p className="text-zinc-500 dark:text-zinc-400 mb-8 leading-relaxed">
-             {endReason === "kicked" ? "The host or a moderator has removed you from this session." 
-             : endReason === "banned" ? "You have been permanently banned from joining this room code." 
-             : endReason === "host_ended" ? "The host has permanently concluded this video session for all participants."
-             : "This video session has been concluded. Thank you for participating."}
+             {endReason === "kicked" ? "The host or a moderator has removed you from this session." : endReason === "banned" ? "You have been permanently banned from joining this room code." : "This video session has been concluded. Thank you for participating."}
            </p>
-           
-           <Button onClick={() => router.push('/dashboard')} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 text-lg font-semibold shadow-lg">
-             Return to Dashboard
-           </Button>
+           <Button onClick={() => router.push('/dashboard')} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 text-lg font-semibold shadow-lg">Return to Dashboard</Button>
         </motion.div>
       </div>
     );
@@ -386,9 +335,7 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
         <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6" />
         <h2 className="text-2xl font-bold mb-2">Waiting for the Host...</h2>
         <p className="text-zinc-500 dark:text-zinc-400 mb-8">The meeting will begin once the host arrives.</p>
-        <Button onClick={() => { setEndReason("left"); room.disconnect(); }} variant="outline" className="w-full h-12 rounded-xl text-md border-zinc-200 dark:border-zinc-800">
-      <PhoneOff className="w-4 h-4 mr-2" /> Just Leave Meeting
-  </Button>
+        <Button onClick={() => router.push('/dashboard')} variant="outline" className="rounded-full px-8 h-12 border-zinc-200 dark:border-zinc-800">Cancel & Leave</Button>
       </div>
     );
   }
@@ -398,10 +345,12 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
   if (typingArray.length === 1) typingString = `${typingArray[0]} is typing...`;
   else if (typingArray.length > 1) typingString = `${typingArray[0]} and ${typingArray.length - 1} others are typing...`;
 
+
   return (
     <RoomAdminContext.Provider value={{ isHost: isActualHost, isModerator, moderators, executeCommand }}>
       <div className="w-full h-full text-zinc-900 dark:text-zinc-100 font-sans relative z-10">
           
+        {/* Floating Lottie Bubbles Layer */}
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 pointer-events-none z-[90]">
             <AnimatePresence>
                 {reactions.map((r) => (
@@ -416,7 +365,7 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
                             {r.name}
                         </div>
                         <div className="w-24 h-24 drop-shadow-2xl">
-                            <Lottie animationData={REACTION_MAP[r.reactionId]} loop={true} />
+                            <Lottie animationData={REACTION_MAP[r.reactionId as keyof typeof REACTION_MAP]} loop={true} />
                         </div>
                     </motion.div>
                 ))}
@@ -426,26 +375,61 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
         <div className="absolute inset-x-4 top-4 bottom-[110px] sm:inset-x-8 sm:top-6 sm:bottom-[110px] mx-auto max-w-7xl z-10 flex flex-col">
           <div className="w-full h-full bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm rounded-[2rem] border border-zinc-200 dark:border-white/10 shadow-xl dark:shadow-2xl p-2 sm:p-4 flex flex-col">
              
-             <div className="flex-1 w-full relative bg-black rounded-[1.5rem] overflow-hidden shadow-inner">
-                <div className="absolute inset-0">
-                   <GridLayout tracks={tracks} style={{ width: '100%', height: '100%' }}>
-                     <ParticipantTile className="relative w-full h-full overflow-hidden rounded-[1rem] bg-zinc-900 shadow-lg border border-white/5">
-                        
-                        <VideoTrack className="absolute inset-0 w-full h-full object-cover" />
-                        
-                        <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg text-white text-xs font-medium shadow-lg z-20 flex items-center gap-2">
-                           <ParticipantMicIndicator />
-                           <ParticipantName />
-                           <ParticipantRoleBadge />
+             {/* 🚨 FIX: Explicit VideoTrack rendering + Google Meet styling 🚨 */}
+             <LayoutContextProvider value={layoutContext}>
+               <div className="flex-1 w-full relative bg-black rounded-[1.5rem] overflow-hidden shadow-inner">
+                  <div className="absolute inset-0 bg-black">
+                     {focusTrack ? (
+                        <div className="flex flex-col sm:flex-row w-full h-full gap-2 p-2 relative bg-black">
+                          {/* Main Pinned/Screen Share Area (Google Meet Style - Contained) */}
+                          <div className="flex-1 w-full h-full relative rounded-xl overflow-hidden shadow-2xl bg-[#111] border border-white/5">
+                            <ParticipantTile trackRef={focusTrack} className="w-full h-full absolute inset-0 bg-[#111]">
+                               <VideoTrack className="absolute inset-0 w-full h-full object-contain" />
+                               <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg text-white text-xs font-medium shadow-lg z-20 flex items-center gap-2">
+                                  <ParticipantMicIndicator />
+                                  <ParticipantName />
+                                  <ParticipantRoleBadge />
+                               </div>
+                               <ParticipantContextOverlay />
+                            </ParticipantTile>
+                          </div>
+                          
+                          {/* Carousel Side Area for other Participants */}
+                          <div className="w-full sm:w-1/4 sm:max-w-[280px] h-32 sm:h-full flex flex-row sm:flex-col gap-2 overflow-x-auto sm:overflow-y-auto sm:pr-1 pb-2 sm:pb-0">
+                            {tracks.filter(t => t.participant.identity !== focusTrack.participant.identity || t.source !== focusTrack.source).map((t) => (
+                               <div key={`${t.participant.identity}-${t.source}`} className="w-40 sm:w-full aspect-video rounded-xl overflow-hidden shadow-lg bg-[#111] shrink-0 relative border border-white/5">
+                                  <ParticipantTile trackRef={t} className="w-full h-full absolute inset-0 bg-[#111]">
+                                     <VideoTrack className="absolute inset-0 w-full h-full object-cover" />
+                                     <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-white text-[10px] font-medium shadow-lg z-20 flex items-center gap-1.5">
+                                        <ParticipantMicIndicator />
+                                        <ParticipantName />
+                                     </div>
+                                     <ParticipantContextOverlay />
+                                  </ParticipantTile>
+                               </div>
+                            ))}
+                          </div>
                         </div>
-
-                        <ParticipantContextOverlay />
-                     </ParticipantTile>
-                   </GridLayout>
-                </div>
-                
-                <RoomAudioRenderer />
-             </div>
+                     ) : (
+                        <div className="w-full h-full p-2 bg-black">
+                           <GridLayout tracks={tracks} style={{ height: '100%', width: '100%' }}>
+                             {/* Traditional Google Meet Grid styling */}
+                             <ParticipantTile className="relative w-full h-full overflow-hidden rounded-xl bg-[#111] shadow-lg border border-white/5">
+                                <VideoTrack className="absolute inset-0 w-full h-full object-contain" />
+                                <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg text-white text-xs font-medium shadow-lg z-20 flex items-center gap-2">
+                                   <ParticipantMicIndicator />
+                                   <ParticipantName />
+                                   <ParticipantRoleBadge />
+                                </div>
+                                <ParticipantContextOverlay />
+                             </ParticipantTile>
+                           </GridLayout>
+                        </div>
+                     )}
+                  </div>
+                  <RoomAudioRenderer />
+               </div>
+             </LayoutContextProvider>
 
              <CaptionsOverlay enabled={captionsEnabled} />
              <TranscriptAccumulator vaultRef={transcriptVault} />
@@ -461,12 +445,7 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
                  <p className="text-zinc-500 dark:text-zinc-400 mb-6">As the host, you can leave the room running for others, or end it permanently for everyone.</p>
                  <div className="flex flex-col gap-3">
                    <Button onClick={handleEndForAll} className="w-full bg-red-600 hover:bg-red-700 text-white h-12 rounded-xl text-md font-bold">End Meeting for All</Button>
-                   
-                   {/* 痩 FIX: Using the PhoneOff icon to solve the unused import warning while improving the UI */}
-                   <Button onClick={() => { setEndReason("ended"); room.disconnect(); }} variant="outline" className="w-full h-12 rounded-xl text-md border-zinc-200 dark:border-zinc-800">
-                      <PhoneOff className="w-4 h-4 mr-2" /> Just Leave Meeting
-                   </Button>
-
+                   <Button onClick={() => { setEndReason("ended"); room.disconnect(); }} variant="outline" className="w-full h-12 rounded-xl text-md border-zinc-200 dark:border-zinc-800">Just Leave Meeting</Button>
                    <Button onClick={() => setShowEndModal(false)} variant="ghost" className="w-full h-12 rounded-xl text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/5">Cancel</Button>
                  </div>
                </motion.div>
@@ -474,139 +453,63 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
           )}
         </AnimatePresence>
 
-        {/* SLIDE-IN CHAT & PEOPLE SIDEBAR */}
-        <AnimatePresence>
-          {isSidebarOpen && (
-            <motion.div 
-              id="sidebar-panel"
-              initial={{ x: "100%", opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: "100%", opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed right-0 top-0 h-full w-80 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl border-l border-zinc-200 dark:border-white/10 flex flex-col z-[100] shadow-[-20px_0_50px_rgba(0,0,0,0.1)] dark:shadow-[-20px_0_50px_rgba(0,0,0,0.5)]"
-            >
-              <div className="flex border-b border-zinc-200 dark:border-white/10 relative">
-                <button onClick={() => setActiveTab("chat")} className={cn("flex-1 py-4 font-bold text-sm", activeTab === "chat" ? "text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-500" : "text-zinc-500")}>Chat</button>
-                <button onClick={() => setActiveTab("people")} className={cn("flex-1 py-4 font-bold text-sm", activeTab === "people" ? "text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-500" : "text-zinc-500")}>People</button>
-                <button onClick={() => setSidebarOpen(false)} className="absolute right-2 top-3 p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 text-zinc-500"><X className="w-4 h-4"/></button>
-              </div>
-              
-              {activeTab === "chat" && (
-                <>
-                  <div className="flex-1 p-5 overflow-y-auto space-y-4">
-                    {messages.map((msg, i) => {
-                      const isMe = msg.sender === localParticipant.name;
-                      return (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={i} className={cn("flex flex-col gap-1 max-w-[85%]", isMe ? "ml-auto items-end" : "items-start")}>
-                          <span className="text-[11px] text-zinc-500 font-medium px-1">{isMe ? "You" : msg.sender}</span>
-                          <div className={cn("px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-md", isMe ? "bg-indigo-600 text-white rounded-tr-sm" : "bg-zinc-100 dark:bg-neutral-800 text-zinc-900 dark:text-gray-200 border border-zinc-200 dark:border-white/5 rounded-tl-sm")}>
-                            {msg.text}
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                    <div ref={scrollRef} />
-                  </div>
-                  
-                  <div className="p-4 border-t border-zinc-200 dark:border-white/10 bg-zinc-50/50 dark:bg-black/20">
-                    {typingString && <div className="text-[11px] text-indigo-500 dark:text-indigo-400 italic mb-2 px-2">{typingString}</div>}
-                    <form onSubmit={handleSendMessage} className="relative flex items-center">
-                      <Input placeholder="Type a message..." value={chatInput} onChange={handleTyping} className="bg-white dark:bg-neutral-950/50 border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white rounded-full pr-12 focus-visible:ring-indigo-500" />
-                      <button type="submit" disabled={!chatInput.trim()} className="absolute right-1 p-2 bg-indigo-600 disabled:bg-zinc-300 dark:disabled:bg-neutral-800 text-white rounded-full transition-colors"><Send className="w-4 h-4" /></button>
-                    </form>
-                  </div>
-                </>
-              )}
-
-              {activeTab === "people" && (
-                <div className="flex-1 p-5 overflow-y-auto space-y-4">
-                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mb-2">
-                        In this meeting ({allParticipants.length})
-                    </h3>
-                    {allParticipants.map((p) => {
-                        const role = getParticipantRole(p);
-                        const isMe = p.identity === localParticipant.identity;
-                        return (
-                            <div key={p.identity} className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/10 transition-colors">
-                                <div className="w-10 h-10 shrink-0 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg">
-                                    {(p.name || "G")[0].toUpperCase()}
-                                </div>
-                                <div className="flex flex-col flex-1 overflow-hidden">
-                                    <span className="text-sm font-medium text-zinc-900 dark:text-white truncate">
-                                        {p.name || "Guest"} {isMe && <span className="text-zinc-400 font-normal">(You)</span>}
-                                    </span>
-                                    <span className="text-xs">
-                                        {role === "Host" && <span className="text-indigo-500 dark:text-indigo-400 font-bold uppercase tracking-wider">Host</span>}
-                                        {role === "Mod" && <span className="text-emerald-500 dark:text-emerald-400 font-bold uppercase tracking-wider">Moderator</span>}
-                                        {role === "Participant" && <span className="text-zinc-500 dark:text-zinc-400">Participant</span>}
-                                    </span>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* SIDEBAR INTEGRATION */}
+        <RoomSidebar 
+            isOpen={isSidebarOpen} 
+            onClose={() => setSidebarOpen(false)} 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab} 
+            uniqueParticipants={uniqueParticipants} 
+            chatMessages={chatMessages as MinimalChatMessage[]} 
+            sendChatMessage={handleSendMessage} 
+            chatInput={chatInput} 
+            setChatInput={setChatInput} 
+            handleTyping={handleTyping} 
+            typingString={typingString}        
+        />
 
         {/* AI Summary Modal */}
         <AnimatePresence>
           {summaryResult && (
-              <motion.div
-                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                  className="absolute inset-0 z-[110] flex items-center justify-center p-4 sm:p-8 pointer-events-auto"
-              >
+              <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="absolute inset-0 z-[110] flex items-center justify-center p-4 sm:p-8 pointer-events-auto">
                   <div className="absolute inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-sm rounded-[2rem] transition-colors" onClick={() => setSummaryResult(null)} />
-                  
-                  <div className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 p-6 sm:p-8 rounded-3xl shadow-2xl flex flex-col transition-colors">
-                      
-                      <div className="flex justify-between items-start mb-4 shrink-0">
-                          <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-indigo-500 dark:from-cyan-400 dark:to-indigo-400 flex items-center gap-2">
-                              <Sparkles className="w-5 h-5 text-cyan-500 dark:text-cyan-400" /> AI Meeting Notes
-                          </h2>
-                          <button onClick={() => setSummaryResult(null)} className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-full transition-colors">
-                              <X className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
-                          </button>
+                  <div className="relative w-full max-w-2xl max-h-full overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 p-6 sm:p-8 rounded-3xl shadow-2xl flex flex-col gap-4 transition-colors">
+                      <div className="flex justify-between items-start">
+                          <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-indigo-500 flex items-center gap-2"><Sparkles className="w-5 h-5" /> AI Meeting Notes</h2>
+                          <button onClick={() => setSummaryResult(null)} className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-full"><PhoneOff className="w-4 h-4 text-zinc-500" /></button>
                       </div>
-                      
-                      <div className="flex-1 overflow-y-auto pr-2 text-zinc-600 dark:text-zinc-300 text-sm sm:text-base leading-relaxed whitespace-pre-wrap transition-colors">
-                          {summaryResult}
+                      <div className="text-zinc-600 dark:text-zinc-300 text-sm sm:text-base leading-relaxed whitespace-pre-wrap">{summaryResult}</div>
+                      <div className="flex justify-end gap-3 border-t border-zinc-200 dark:border-white/10 pt-4 shrink-0 mt-4">
+                          <Button onClick={handleCopySummary} variant="outline" className="h-10 px-4 rounded-xl border-zinc-200 dark:border-zinc-800"><Copy className="w-4 h-4 mr-2" /> Copy</Button>
+                          <Button onClick={handleDownloadNotes} className="h-10 px-4 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"><Download className="w-4 h-4 mr-2" /> Download</Button>
                       </div>
-
-                      <div className="flex justify-end gap-3 mt-6 border-t border-zinc-200 dark:border-white/10 pt-4 shrink-0">
-                          <Button onClick={handleCopySummary} variant="outline" className="h-10 px-4 rounded-xl border-zinc-200 dark:border-zinc-800">
-                              <Copy className="w-4 h-4 mr-2" /> Copy Text
-                          </Button>
-                          <Button onClick={handleDownloadNotes} className="h-10 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white">
-                              <Download className="w-4 h-4 mr-2" /> Download Notes
-                          </Button>
-                      </div>
-
                   </div>
               </motion.div>
           )}
         </AnimatePresence>
                
-        {/* Modular Systems */}
-        <ReactionEngine onReaction={addReactionToScreen} visible={showMobileControls} />
-        
-       <FloatingControlBar 
-          visible={showMobileControls} 
-          
-          captionsEnabled={captionsEnabled}
-          onToggleCaptions={() => setCaptionsEnabled(!captionsEnabled)}
-          
-          blurEnabled={blurEnabled}
-          onToggleBlur={() => setBlurEnabled(!blurEnabled)}
-          
-          onGenerateSummary={handleGenerateSummary}
-          isSummarizing={isSummarizing}
-          
-          onToggleChat={() => setSidebarOpen(!isSidebarOpen)}
-          isChatOpen={isSidebarOpen}
-          onLeave={handleLeaveClick}
-        />
+        {/* FADING MODULAR CONTROLS */}
+        <div className={cn("transition-opacity duration-500 z-[100] fixed inset-0 pointer-events-none", isControlsVisible ? "opacity-100" : "opacity-0")}>
+           <div className="pointer-events-auto">
+             <ReactionEngine onReaction={handleAddReaction} visible={true} />
+             <FloatingControlBar 
+                 visible={true} isGuest={false} 
+                 captionsEnabled={captionsEnabled} onToggleCaptions={() => setCaptionsEnabled(!captionsEnabled)}
+                 onGenerateSummary={handleGenerateSummary} isSummarizing={isSummarizing}
+                 blurEnabled={blurEnabled} onToggleBlur={() => setBlurEnabled(!blurEnabled)}
+                 onToggleChat={() => setSidebarOpen(prev => !prev)} isChatOpen={isSidebarOpen}
+                 onLeave={() => {
+                   if (isActualHost) {
+                     setShowEndModal(true);
+                   } else {
+                     setEndReason("ended");
+                     room.disconnect();
+                   }
+                 }}
+             />
+           </div>
+        </div>
+
       </div>
     </RoomAdminContext.Provider>
   );
