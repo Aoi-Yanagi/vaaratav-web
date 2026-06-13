@@ -21,7 +21,7 @@ import {
   useParticipantContext
 } from "@livekit/components-react";
 import "@livekit/components-styles";
-import { RoomEvent, Track, DataPacket_Kind, RemoteParticipant } from "livekit-client";
+import { RoomEvent, Track, DataPacket_Kind, RemoteParticipant, ParticipantKind } from "livekit-client";
 
 // Required Icons
 import { 
@@ -97,9 +97,13 @@ export function LiveKitVideoRoom({ roomCode, token, isHost }: LiveKitVideoRoomPr
   }
 
   return (
-    <LiveKitRoom
+   <LiveKitRoom
       video={true} 
-      audio={true} 
+      audio={{
+          noiseSuppression: true, // <-- Changed to noiseSuppression!
+          echoCancellation: true,
+          autoGainControl: true,
+      }}
       connect={true}
       token={token}
       serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
@@ -273,17 +277,38 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
      setTimeout(() => setReactions(prev => prev.filter(r => r.id !== reactionData.id)), 3000);
   }, []);
 
-  const handleGenerateSummary = async () => {
-    if (transcriptVault.current.length === 0) { alert("No words have been spoken yet!"); return; }
-    setIsSummarizing(true);
-    setSummaryResult(null);
-    try {
-        const response = await fetch('/api/summary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transcript: transcriptVault.current }) });
-        const data = await response.json();
-        if (data.summary) setSummaryResult(data.summary);
-        else alert("Error: " + data.error);
-    } catch (error) { console.error("Failed to fetch summary:", error); } 
-    finally { setIsSummarizing(false); }
+ const handleGenerateSummary = async () => {
+      if (!localParticipant) return;
+      setIsSummarizing(true);
+      setSummaryResult(null); // Clear old results to show loading state
+
+      try {
+          // 1. Locate the AI Agent in the room
+          const agentParticipant = Array.from(room.remoteParticipants.values()).find(
+              p => p.identity.includes("agent") || p.kind === ParticipantKind.AGENT
+          );
+
+          if (!agentParticipant) {
+              alert("Agent is not currently in the room.");
+              return;
+          }
+
+          // 2. Call the Python backend securely
+          const response = await localParticipant.performRpc({
+              destinationIdentity: agentParticipant.identity,
+              method: "generate_summary",
+              payload: JSON.stringify({}),
+          });
+
+          // 3. MAGIC: Set the result state so the nice UI Modal pops up!
+          setSummaryResult(response); 
+          
+      } catch (error) {
+          console.error("Failed to generate summary:", error);
+          alert("Failed to generate summary. Make sure the AI Agent is running.");
+      } finally {
+          setIsSummarizing(false);
+      }
   };
 
   const handleCopySummary = () => {
@@ -492,21 +517,21 @@ function RoomUI({ roomCode, initialIsHost }: { roomCode: string, initialIsHost?:
         <div className={cn("transition-opacity duration-500 z-[100] fixed inset-0 pointer-events-none", isControlsVisible ? "opacity-100" : "opacity-0")}>
            <div className="pointer-events-auto">
              <ReactionEngine onReaction={handleAddReaction} visible={true} />
-             <FloatingControlBar 
-                 visible={true} isGuest={false} 
-                 captionsEnabled={captionsEnabled} onToggleCaptions={() => setCaptionsEnabled(!captionsEnabled)}
-                 onGenerateSummary={handleGenerateSummary} isSummarizing={isSummarizing}
-                 blurEnabled={blurEnabled} onToggleBlur={() => setBlurEnabled(!blurEnabled)}
-                 onToggleChat={() => setSidebarOpen(prev => !prev)} isChatOpen={isSidebarOpen}
-                 onLeave={() => {
-                   if (isActualHost) {
-                     setShowEndModal(true);
-                   } else {
-                     setEndReason("ended");
-                     room.disconnect();
-                   }
-                 }}
-             />
+           <FloatingControlBar 
+    visible={true} isGuest={false} 
+    captionsEnabled={captionsEnabled} onToggleCaptions={() => setCaptionsEnabled(!captionsEnabled)}
+    onGenerateSummary={handleGenerateSummary} isSummarizing={isSummarizing} // <-- Added this line back!
+    blurEnabled={blurEnabled} onToggleBlur={() => setBlurEnabled(!blurEnabled)}
+    onToggleChat={() => setSidebarOpen(prev => !prev)} isChatOpen={isSidebarOpen}
+    onLeave={() => {
+        if (isActualHost) {
+            setShowEndModal(true);
+        } else {
+            setEndReason("ended");
+            room.disconnect();
+        }
+    }}
+/>
            </div>
         </div>
 

@@ -7,7 +7,7 @@ import {
   useLocalParticipant, 
   useDataChannel 
 } from "@livekit/components-react";
-import { RoomEvent, TranscriptionSegment, Participant, LocalVideoTrack } from "livekit-client";
+import { RoomEvent, TranscriptionSegment, Participant, LocalVideoTrack, ParticipantKind } from "livekit-client";
 import { 
   Mic, MicOff, Video as VideoIcon, VideoOff, MonitorUp, PhoneOff, 
   Sparkles, MessageSquare, MoreVertical, Ban, LogOut, ShieldMinus, ShieldAlert, ShieldCheck, Send, X, Loader2
@@ -85,7 +85,7 @@ export function ParticipantContextOverlay() {
   const hasAuthority = !p.isLocal && (isHost || (isModerator && !pIsMod && !pIsHost));
 
   if (!hasAuthority) return null;
-
+  
   return (
     <div className="absolute top-3 right-3 z-50">
        <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 bg-black/50 hover:bg-black/80 rounded-lg backdrop-blur-md transition-colors text-white shadow-lg border border-white/10">
@@ -199,8 +199,8 @@ interface FloatingControlBarProps {
   isGuest?: boolean;
   captionsEnabled?: boolean;
   onToggleCaptions?: () => void;
-  onGenerateSummary?: () => void;
-  isSummarizing?: boolean;
+  onGenerateSummary?: () => void; 
+  isSummarizing?: boolean;        
   blurEnabled?: boolean;
   onToggleBlur?: () => void;
   onToggleChat?: () => void;
@@ -210,13 +210,14 @@ interface FloatingControlBarProps {
 
 export function FloatingControlBar({ 
     visible, isGuest = false, captionsEnabled = false, onToggleCaptions,
-    onGenerateSummary, isSummarizing = false, blurEnabled = false, onToggleBlur, onToggleChat, isChatOpen = false, onLeave
+    onGenerateSummary, isSummarizing = false, // <-- Added back
+    blurEnabled = false, onToggleBlur, onToggleChat, isChatOpen = false, onLeave
 }: FloatingControlBarProps) {
   
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled, cameraTrack } = useLocalParticipant();
   const [aiMenuOpen, setAiMenuOpen] = useState(false);
   const processorRef = useRef<ReturnType<typeof BackgroundProcessor> | null>(null);
-
+  
   useEffect(() => {
     if (!cameraTrack?.track) return;
     const track = cameraTrack.track as LocalVideoTrack;

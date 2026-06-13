@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { db } from "@/lib/db"; // 👈 Don't forget to import your Prisma DB!
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +22,24 @@ export async function GET(req: Request) {
     let identity = "";
     let isHost = false;
 
-    // Logic: Authenticated Users = Hosts. Fallback to Guest Name.
+    // 1. Fetch the actual meeting from the DB using the room code
+    // We include the host so we can easily check the host's email
+    const meeting = await db.meeting.findUnique({
+      where: { meetingCode: room },
+      include: { host: true }
+    });
+
     if (session?.user) {
-        identity = session.user.name || session.user.email || "Host User";
-        isHost = true; 
+        identity = session.user.name || session.user.email || "Registered User";
+        
+        // 2. STRICT AUTHORIZATION CHECK
+        // Only grant host status if the logged-in email matches the meeting creator's email
+        if (meeting && meeting.host.email === session.user.email) {
+            isHost = true; 
+        } else {
+            isHost = false; // Registered user, but NOT the owner of this specific room
+        }
+        
     } else if (guestUsername) {
         identity = guestUsername;
         isHost = false;
@@ -53,7 +68,7 @@ export async function GET(req: Request) {
         canPublish: true, 
         canSubscribe: true,
         canPublishData: true, // Required for Chat & Reactions
-        roomAdmin: isHost     // Only give host powers to logged in users
+        roomAdmin: isHost     // 👈 Now properly checks ownership!
     });
 
     const token = await at.toJwt();

@@ -16,6 +16,8 @@ if not os.getenv("LIVEKIT_URL"): missing_keys.append("LIVEKIT_URL")
 if not os.getenv("LIVEKIT_API_KEY"): missing_keys.append("LIVEKIT_API_KEY")
 if not os.getenv("LIVEKIT_API_SECRET"): missing_keys.append("LIVEKIT_API_SECRET")
 if not os.getenv("DEEPGRAM_API_KEY"): missing_keys.append("DEEPGRAM_API_KEY")
+# Added this check so your new OpenAI integration doesn't crash!
+if not os.getenv("OPENAI_API_KEY"): missing_keys.append("OPENAI_API_KEY") 
 
 if missing_keys:
     print(f"\n❌ CRITICAL ERROR: Missing the following keys in your .env file: {', '.join(missing_keys)}")
@@ -26,10 +28,14 @@ if missing_keys:
 from livekit import rtc
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, WorkerType
 from livekit.agents import stt as lk_stt
-from livekit.plugins import deepgram
+# Added openai to the imports!
+from livekit.plugins import deepgram, openai
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("transcriber")
+
+# Global list to store the conversation
+meeting_transcripts = []
 
 async def entrypoint(ctx: JobContext):
     logger.info("Connecting to LiveKit room...")
@@ -37,10 +43,35 @@ async def entrypoint(ctx: JobContext):
     logger.info(f"✅ Successfully connected to room: {ctx.room.name}")
 
     try:
-        stt_engine = deepgram.STT()
+        # Upgraded to nova-2 and smart_format
+        stt_engine = deepgram.STT(
+            model="nova-2",
+            language="en-US",
+            smart_format=True
+        )
     except Exception as e:
         logger.error(f"❌ Failed to initialize Deepgram: {e}")
         return
+
+    # RPC endpoint for frontend to request a summary
+    @ctx.room.local_participant.register_rpc_method("generate_summary")
+    async def generate_summary(req: rtc.RpcInvocation):
+        logger.info("Summary requested by frontend!")
+        
+        if not meeting_transcripts:
+            return "Not enough conversation has happened yet to generate a summary."
+
+        full_conversation = " ".join(meeting_transcripts)
+        
+        llm = openai.LLM(model="gpt-4o-mini")
+        prompt = f"Summarize the following meeting transcript in 3-4 bullet points:\n\n{full_conversation}"
+        
+        try:
+            response = await llm.chat(messages=[{"role": "user", "content": prompt}])
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error generating summary: {e}")
+            return "Failed to generate summary due to an internal error."
 
     @ctx.room.on("track_subscribed")
     def on_track_subscribed(track: rtc.Track, publication: rtc.RemoteTrackPublication, participant: rtc.RemoteParticipant):
@@ -67,7 +98,6 @@ async def transcribe_track(room: rtc.Room, track: rtc.Track, participant: rtc.Re
                 if text:
                     logger.info(f"[{participant.identity}] {text}")
                     
-                    # FIX: We dynamically generate a UUID for the text segment here!
                     segment = rtc.TranscriptionSegment(
                         id=str(uuid.uuid4()), 
                         text=text,
@@ -78,9 +108,13 @@ async def transcribe_track(room: rtc.Room, track: rtc.Track, participant: rtc.Re
                     )
                     transcription = rtc.Transcription(
                         participant_identity=participant.identity,
-                        track_sid=track.sid,  # <-- NEW: Add the track ID here
+                        track_sid=track.sid,  
                         segments=[segment]
                     )
+                    
+                    # Save the text to memory for the summary function
+                    if segment.text.strip():
+                        meeting_transcripts.append(f"{participant.identity}: {segment.text}")
                     
                     # Push text to your Next.js frontend
                     asyncio.create_task(room.local_participant.publish_transcription(transcription))
