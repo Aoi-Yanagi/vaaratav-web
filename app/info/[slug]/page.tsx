@@ -7,63 +7,65 @@ import { Button } from "@/components/ui/button";
 import GlobalNavigation from "@/components/ui/global-navigation";
 
 const pageContent: Record<string, { title: string; icon: LucideIcon; content: string }> = {
+  // --- MAIN MENU OPTION DESCRIPTIONS ---
+  about: {
+    title: "About Vaarta.V",
+    icon: Info,
+    content: "Vaarta.V was born from a simple belief: genuine human connection shouldn't require clunky software. We are a passionate team dedicated to redefining video communications. We are big enough to provide enterprise-grade reliability, yet small enough to care about every pixel of your experience. Welcome to the next generation of frictionless, no-app video meetings."
+  },
   features: {
-    title: "Platform Features",
+    title: "Next-Gen Features",
     icon: LayoutTemplate,
-    content: "We are currently compiling a comprehensive list of all our HD video, scheduling, and security features. Check back soon for the full breakdown!"
+    content: "Experience crystal-clear HD video, studio-quality audio, and ultra-low latency powered by LiveKit. Vaarta.V boasts bank-grade security, seamless screen sharing, interactive AI-powered summaries, and dynamic UI layouts. Best of all? It runs entirely within your browser with zero downloads required. Just click, connect, and collaborate."
   },
   faq: {
     title: "Frequently Asked Questions",
     icon: HelpCircle,
-    content: "Got questions? We are putting together a detailed FAQ to help you get the most out of your video meetings."
+    content: "We believe in total transparency. Whether you are wondering about our End-to-End Encryption (E2EE), maximum room capacities, or how our browser-first technology achieves zero-latency streams, we have compiled all the answers you need to get the absolute most out of your Vaarta.V experience."
   },
   pricing: {
-    title: "Pricing Plans",
+    title: "Transparent Pricing",
     icon: Tag,
-    content: "Simple, transparent pricing is on the way. Whether you are an individual or an enterprise, we will have a plan for you."
-  },
-  licenses: {
-    title: "Licenses & Legal",
-    icon: Shield,
-    content: "Information regarding our software licenses, open-source attributions, and legal documentation will be available here."
-  },
-  changelog: {
-    title: "Changelog",
-    icon: List,
-    content: "Keep track of all the latest updates, bug fixes, and new features we are pushing to the platform."
-  },
-  "style-guide": {
-    title: "Style Guide",
-    icon: Palette,
-    content: "Our brand assets, color palettes, and typography guidelines will be hosted here for press and design use."
-  },
-  about: {
-    title: "About Us",
-    icon: Info,
-    content: "Learn more about our mission to redefine video communications, making them accessible, secure, and lightning-fast."
+    content: "Powerful communication should be accessible to everyone. We offer fiercely competitive, flat-rate pricing with zero hidden fees. From our generous free tier built for quick catch-ups, to our robust enterprise solutions boasting unlimited duration and custom branding—you only pay for the power you truly need."
   },
   blog: {
-    title: "VaartaV Blog",
+    title: "The Vaarta.V Blog",
     icon: FileText,
-    content: "Our engineering and product teams are writing up some great articles. The blog will be launching shortly!"
+    content: "Dive into our latest thoughts on the future of remote work, deep-dives into WebRTC engineering, and tips on fostering digital culture. Our engineering and product teams regularly share behind-the-scenes insights into how we are building the fastest video platform on the web."
   },
   contact: {
-    title: "Contact Us",
+    title: "Get in Touch",
     icon: Mail,
-    content: "Need to reach out? You can email us at hello@vaartav.com or call our support line. A full contact form is coming soon."
+    content: "We would absolutely love to hear from you. Whether you are an enterprise looking for a custom deployment, a developer with feedback, or just someone who wants to say hello—our team is always on standby. Drop us a line, and a real human will get back to you shortly."
+  },
+
+  // --- UTILITY OPTION DESCRIPTIONS ---
+  status: {
+    title: "System Status",
+    icon: Activity,
+    content: "Unwavering reliability is our core promise. All Vaarta.V systems, routing servers, and AI integration services are currently fully operational. We maintain a 99.99% uptime SLA to ensure your critical conversations never drop."
   },
   protected: {
     title: "Password Protected",
     icon: Lock,
-    content: "This area contains secure documents and requires special authorization. Authentication gateways are being configured."
+    content: "Your privacy is non-negotiable. This specific room or resource has been secured with AES-256 bit encryption and requires a host-approved passcode to enter. Please authenticate to continue to your secure environment."
   },
-  status: {
-    title: "System Status",
-    icon: Activity,
-    content: "All servers and video routing systems are fully operational. We will post any maintenance or downtime notices here."
+  changelog: {
+    title: "Changelog & Updates",
+    icon: List,
+    content: "We ship fast and we iterate constantly. Explore our timeline of continuous improvements, new AI feature rollouts, and performance optimizations. We are relentlessly upgrading Vaarta.V based on the feedback of users like you."
+  },
+  licenses: {
+    title: "Licenses & Legal",
+    icon: Shield,
+    content: "We stand on the shoulders of open-source giants. Here you will find our comprehensive legal documentation, terms of service, privacy policies, and attributions to the brilliant open-source libraries that help make Vaarta.V possible."
+  },
+  "style-guide": {
+    title: "Design & Style Guide",
+    icon: Palette,
+    content: "Designed with precision by Avikal. This style guide serves as the visual heartbeat of Vaarta.V, detailing our typography scale (Outfit), interactive motion principles, and the dark-mode optimized color palette that makes our UI feel so seamless."
   }
 };
-
 export default function DynamicInfoPage() {
   const router = useRouter();
   

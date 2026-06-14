@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { Send, MapPin, Phone, Mail, Linkedin, Github, Youtube, CheckCircle2 } from "lucide-react";
 
 const menuLinks = [
@@ -15,19 +17,15 @@ const menuLinks = [
 ];
 
 const utilityLinks = [
-  { label: 'System Status', href: '/info/status' }, // Replaced the 404 link here!
+  { label: 'System Status', href: '/info/status' }, 
   { label: 'Password protected', href: '/info/protected' },
   { label: 'Changelog', href: '/info/changelog' },
   { label: 'Licenses', href: '/info/licenses' },
   { label: 'Style guide', href: '/info/style-guide' },
 ];
+
 const XIcon = ({ className }: { className?: string }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    viewBox="0 0 24 24" 
-    fill="currentColor" 
-    className={className}
-  >
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 22.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
   </svg>
 );
@@ -40,8 +38,12 @@ const socialLinks = [
 ];
 
 export default function Footer() {
+  const pathname = usePathname();
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [email, setEmail] = useState("");
+  
+  // State for the Home Button Popup
+  const [showHomePopup, setShowHomePopup] = useState(false);
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,12 +52,33 @@ export default function Footer() {
     }
   };
 
+  // Logic to intercept the Home click
+  const handleHomeClick = (e: React.MouseEvent) => {
+    if (pathname === "/") {
+      e.preventDefault(); 
+      setShowHomePopup(true);
+      setTimeout(() => setShowHomePopup(false), 4000); // Auto-hide after 4 seconds
+    }
+  };
+
+  // Logic to scroll to top when the popup is clicked
+  const scrollToTop = () => {
+    const scrollContainer = document.getElementById("main-scroll-container");
+    if (scrollContainer) {
+      scrollContainer.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    setShowHomePopup(false); 
+  };
+
   return (
     <footer className="w-full border-t border-zinc-200 dark:border-white/10 bg-white/80 dark:bg-black/50 backdrop-blur-xl pt-20 pb-10 relative z-10 transition-colors duration-500">
       <div className="container mx-auto px-6 lg:px-10">
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 mb-16">
           
+          {/* Logo & Newsletter */}
           <div className="flex flex-col gap-6">
             <Link href="/" className="flex items-center gap-1 group w-fit">
               <span className="text-[26px] font-extrabold text-zinc-900 dark:text-white tracking-tight transition-colors">
@@ -92,19 +115,56 @@ export default function Footer() {
             </div>
           </div>
 
-          <div>
+          {/* Menu with Interactive Home Button */}
+         <div>
             <h4 className="text-zinc-900 dark:text-white font-bold mb-6 transition-colors">Menu</h4>
             <ul className="flex flex-col gap-4 text-sm text-zinc-600 dark:text-gray-400">
               {menuLinks.map((link) => (
-                <li key={link.label}>
-                  <Link href={link.href} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                    {link.label}
-                  </Link>
+                // FIX: Removed the conditional 'w-fit' so all items align perfectly
+                <li key={link.label} className="relative">
+                  {link.label === 'Home' ? (
+                    <>
+                      <Link 
+                        href="/" 
+                        onClick={handleHomeClick} 
+                        className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors inline-block"
+                      >
+                        {link.label}
+                      </Link>
+
+                      {/* THE SPRING & FLOATING POPUP */}
+                      <AnimatePresence>
+                        {showHomePopup && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                            // FIX: Animate Y through an array to make it float up and down
+                            animate={{ opacity: 1, y: [0, -6, 0], scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            transition={{ 
+                              opacity: { duration: 0.2 },
+                              scale: { type: "spring", stiffness: 400, damping: 25 },
+                              // FIX: Loop the Y animation infinitely for the floating effect
+                              y: { duration: 2.5, repeat: Infinity, ease: "easeInOut" } 
+                            }}
+                            onClick={scrollToTop}
+                            className="absolute left-0 bottom-[130%] mb-1 w-[180px] text-center bg-indigo-600 text-white text-xs font-medium p-3 rounded-xl cursor-pointer shadow-xl border border-indigo-500 hover:bg-indigo-500 transition-colors z-[100]"
+                          >
+                            We are already at Home. Scroll to Top?                            
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </>
+                  ) : (
+                    <Link href={link.href} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors inline-block">
+                      {link.label}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
           </div>
 
+          {/* Utility Pages */}
           <div>
             <h4 className="text-zinc-900 dark:text-white font-bold mb-6 transition-colors">Utility Pages</h4>
             <ul className="flex flex-col gap-4 text-sm text-zinc-600 dark:text-gray-400">
@@ -118,17 +178,16 @@ export default function Footer() {
             </ul>
           </div>
 
+          {/* Contact Us */}
           <div>
             <h4 className="text-zinc-900 dark:text-white font-bold mb-6 transition-colors">Contact Us</h4>
             <ul className="flex flex-col gap-5 text-sm text-zinc-600 dark:text-gray-400">
-              
               <li className="flex items-start gap-3 group">
                 <Phone className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 group-hover:text-indigo-500 dark:group-hover:text-indigo-300 transition-colors" />
                 <a href="tel:+918005550103" className="group-hover:text-zinc-900 dark:group-hover:text-white transition-colors cursor-pointer">
                   +91 (8XX)-9XXX-45X
                 </a>
               </li>
-              
               <li className="flex items-start gap-3 group">
                 <MapPin className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 group-hover:text-indigo-500 dark:group-hover:text-indigo-300 transition-colors" />
                 <a 
@@ -140,18 +199,17 @@ export default function Footer() {
                   Lucknow, Uttar Pradesh, India - 226001
                 </a>
               </li>
-              
               <li className="flex items-start gap-3 group">
                 <Mail className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 group-hover:text-indigo-500 dark:group-hover:text-indigo-300 transition-colors" />
                 <a href="mailto:hello@vaartav.com" className="group-hover:text-zinc-900 dark:group-hover:text-white transition-colors cursor-pointer">
                   hello@vaartav.com
                 </a>
               </li>
-
             </ul>
           </div>
         </div>
 
+        {/* Footer Bottom */}
         <div className="pt-8 border-t border-zinc-200 dark:border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 transition-colors">
           <p className="text-sm text-zinc-500 dark:text-gray-500">
             © {new Date().getFullYear()} Copyright Vaarta. V | Designed with precision by Avikal. All rights reserved.
