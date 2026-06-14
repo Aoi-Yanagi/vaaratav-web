@@ -61,6 +61,7 @@ export default function GuestChat({ params }: { params: Promise<{ roomId: string
     setIsClosing(true);
     try {
       await fetch('/api/end', { method: 'POST', body: JSON.stringify({ roomId }) });
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {
       console.error("Failed to end session gracefully");
     }

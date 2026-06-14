@@ -4,10 +4,27 @@ import { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Copy, ShieldCheck, Loader2, Calendar, Clock, Edit3, X } from "lucide-react";
-import { LiveKitVideoRoom } from "@/components/LiveKitVideoRoom";
+import dynamic from 'next/dynamic';
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 
+// This creates a lazy-loaded version of your room
+const LiveKitVideoRoom = dynamic(
+  () => import('@/components/LiveKitVideoRoom').then((mod) => mod.LiveKitVideoRoom),
+  { 
+    // This is strictly required for LiveKit. It prevents the server from trying to 
+    // render WebRTC elements (like camera tracks) before the code reaches the browser.
+    ssr: false, 
+    
+    // This UI will show instantly while the heavy JavaScript is downloading
+    loading: () => (
+      <div className="flex flex-col items-center justify-center min-h-[100dvh] w-full bg-zinc-50 dark:bg-zinc-950">
+        <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
+        <p className="text-zinc-500 dark:text-zinc-400 font-medium">Preparing secure room environment...</p>
+      </div>
+    )
+  }
+);
 export default function MeetingLobby({ params }: { params: Promise<{ meetingCode: string }> }) {
   const router = useRouter();
   const unwrappedParams = use(params);

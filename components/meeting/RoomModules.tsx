@@ -7,7 +7,7 @@ import {
   useLocalParticipant, 
   useDataChannel 
 } from "@livekit/components-react";
-import { RoomEvent, TranscriptionSegment, Participant, LocalVideoTrack, ParticipantKind } from "livekit-client";
+import { RoomEvent, TranscriptionSegment, Participant, LocalVideoTrack } from "livekit-client";
 import { 
   Mic, MicOff, Video as VideoIcon, VideoOff, MonitorUp, PhoneOff, 
   Sparkles, MessageSquare, MoreVertical, Ban, LogOut, ShieldMinus, ShieldAlert, ShieldCheck, Send, X, Loader2

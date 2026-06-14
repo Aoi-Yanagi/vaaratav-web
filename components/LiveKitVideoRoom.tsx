@@ -22,10 +22,9 @@ import {
 } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { RoomEvent, Track, DataPacket_Kind, RemoteParticipant, ParticipantKind } from "livekit-client";
-
 // Required Icons
 import { 
-  Sparkles, Ban, Copy, Download, PhoneOff 
+  Sparkles, Ban, Copy, Download, PhoneOff
 } from "lucide-react";
 
 import { motion, AnimatePresence } from "framer-motion";

@@ -31,6 +31,13 @@ export default function RootLayout({
   return (
     // Add next-themes required hydration suppression
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Tells the browser to establish early connections to the domain hosting your assets */}
+        <link rel="preconnect" href="https://vaaratav-web.vercel.app" />
+        
+        {/* Do the same for your LiveKit Server URL so it connects faster! */}
+        <link rel="preconnect" href={process.env.NEXT_PUBLIC_LIVEKIT_URL} />
+      </head>
       <body className={cn("min-h-screen bg-background font-sans antialiased", outfit.variable)}>
         <Providers> 
            {children}
